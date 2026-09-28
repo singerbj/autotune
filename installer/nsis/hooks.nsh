@@ -4,7 +4,7 @@
 ; Variables used from the template: $INSTDIR, $UpdateMode (1 when the
 ; updater runs the installer with /UPDATE), $PassiveMode (/P).
 ;
-; Install:   silently install VB-Cable if missing (one UAC prompt — the
+; Install:   silently install VB-Cable if missing (one UAC prompt - the
 ;            installer itself is per-machine/elevated), record that we did,
 ;            and ask for one reboot that reopens the app in the setup wizard.
 ; Uninstall: restore the user's default microphone, then offer to remove
