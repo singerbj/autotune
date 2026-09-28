@@ -26,12 +26,22 @@ Describe 'Invoke-Install (FR-15)' {
     It 'installs silently and requests a reboot when missing' {
         Mock Test-VBCableInstalled { $false }
         Mock Get-DriverPack { 'C:\pack\VBCABLE_Setup_x64.exe' }
+        Mock Test-TrustedVBAudioSignature { $true }
         Mock Add-VBAudioTrustedPublisher { }
         Mock Invoke-Setup { 0 }
         Mock Save-Marker { }
         Invoke-Install | Should -Be 3010
         Should -Invoke Invoke-Setup -Times 1 -ParameterFilter { $Arguments -contains '-i' -and $Arguments -contains '-h' }
         Should -Invoke Save-Marker -Times 1 -ParameterFilter { $Installed -eq $true }
+    }
+}
+
+Describe 'Exit codes are clean integers' {
+    It 'logging does not leak into return values' {
+        Mock Test-VBCableInstalled { $true }
+        $r = Invoke-Install
+        $r | Should -BeOfType [int]
+        @($r).Count | Should -Be 1
     }
 }
 

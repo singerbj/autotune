@@ -44,7 +44,9 @@ $LogFile = Join-Path $env:TEMP 'voice-tuner-vbcable.log'
 
 function Write-VtLog([string] $Message) {
     $line = '{0:u} {1}' -f (Get-Date), $Message
-    Write-Output $line
+    # Host stream, not the output stream: functions here return exit codes,
+    # and anything written to the output stream would become part of them.
+    Write-Host $line
     try { Add-Content -Path $LogFile -Value $line -ErrorAction Stop }
     catch { Write-Verbose "could not write ${LogFile}: $_" }
 }
