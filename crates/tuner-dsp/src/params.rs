@@ -51,7 +51,7 @@ impl VoiceRange {
 /// audio thread without allocation.
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "camelCase", default))]
+#[cfg_attr(feature = "serde", serde(rename_all = "camelCase"))]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct TuningParams {
     /// Key root as a pitch class, 0 = C … 11 = B.

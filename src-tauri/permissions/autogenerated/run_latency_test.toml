@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-run-latency-test"
+description = "Enables the run_latency_test command without any pre-configured scope."
+commands.allow = ["run_latency_test"]
+
+[[permission]]
+identifier = "deny-run-latency-test"
+description = "Denies the run_latency_test command without any pre-configured scope."
+commands.deny = ["run_latency_test"]

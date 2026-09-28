@@ -11,6 +11,7 @@ publish = false
 default = []
 serde = ["dep:serde", "tuner-dsp/serde", "tuner-audio/serde"]
 specta = ["dep:specta", "tuner-dsp/specta", "tuner-audio/specta"]
+asio = ["tuner-audio/asio"]
 
 [dependencies]
 tuner-dsp.workspace = true

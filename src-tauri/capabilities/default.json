@@ -1,0 +1,38 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main window: the app's own commands and event listening only. No plugin APIs, no remote content.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:app:allow-version",
+    "allow-ping",
+    "allow-get-app-info",
+    "allow-list-devices",
+    "allow-get-config",
+    "allow-set-config",
+    "allow-start-engine",
+    "allow-stop-engine",
+    "allow-get-engine-status",
+    "allow-set-params",
+    "allow-set-bypass",
+    "allow-run-latency-test",
+    "allow-run-setup-check",
+    "allow-set-route-all-apps",
+    "allow-open-asio-panel",
+    "allow-get-diagnostics",
+    "allow-complete-wizard",
+    "allow-set-launch-at-login",
+    "allow-save-preset",
+    "allow-load-preset",
+    "allow-delete-preset",
+    "allow-get-update-status",
+    "allow-check-for-update",
+    "allow-install-update",
+    "allow-hide-window",
+    "allow-quit-app"
+  ]
+}

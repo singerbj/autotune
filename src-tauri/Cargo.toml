@@ -1,0 +1,50 @@
+[package]
+name = "voice-tuner"
+description = "Real-time voice tuner for Windows"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+default-run = "voice-tuner"
+
+[lib]
+name = "voice_tuner_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+default = []
+# Include the ASIO capture tier (needs the Steinberg SDK at build time).
+asio = ["tuner-engine/asio"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+tuner-dsp = { workspace = true, features = ["serde", "specta"] }
+tuner-audio = { workspace = true, features = ["serde", "specta"] }
+tuner-engine = { workspace = true, features = ["serde", "specta"] }
+tuner-win = { workspace = true, features = ["specta"] }
+tauri = { version = "2.12", features = ["tray-icon", "image-png"] }
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+specta.workspace = true
+specta-typescript = "0.0.12"
+tauri-plugin-single-instance = "2.5"
+tauri-plugin-autostart = "2.6"
+tauri-plugin-global-shortcut = "2.4"
+tauri-plugin-updater = "2.13"
+tauri-plugin-process = "2.4"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+tokio = { version = "1", features = ["time"] }
+assert_no_alloc.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
