@@ -40,6 +40,8 @@ struct Shared {
     /// Instant of the first non-zero sample rendered per device.
     first_sound: HashMap<String, Instant>,
     fail_exclusive: bool,
+    /// Extra loopback "air" delay in frames, adjustable while running.
+    air_delay: usize,
 }
 
 /// See module docs.
@@ -76,6 +78,7 @@ impl MockBackend {
                 rendered: HashMap::new(),
                 first_sound: HashMap::new(),
                 fail_exclusive: false,
+                air_delay: 0,
             })),
             period_frames: 480,
             sample_rate: 48_000,
@@ -143,7 +146,16 @@ impl MockBackend {
     pub fn set_signal(&self, s: MockSignal) {
         let mut sh = lock(&self.shared);
         sh.loopback.clear();
+        if let MockSignal::Loopback { delay_frames } = s {
+            sh.air_delay = delay_frames;
+        }
         sh.signal = s;
+    }
+
+    /// Change the loopback delay of running streams (keeps thread phase, so
+    /// measurements before and after differ by exactly this change).
+    pub fn set_air_delay(&self, frames: usize) {
+        lock(&self.shared).air_delay = frames;
     }
 
     /// Make exclusive mode fail so the fallback chain is exercised.
@@ -292,7 +304,12 @@ impl AudioBackend for MockBackend {
         // The "air" delay lives on the capture side so it is independent of
         // when the render thread starts.
         let mut air: VecDeque<f32> = VecDeque::new();
-        let mut air_primed = false;
+        // Samples the capture side substituted with silence because the
+        // render thread was momentarily late; dropped when they arrive so
+        // the loopback timing never drifts.
+        let mut debt = 0usize;
+        let mut primed = false;
+        let slack = 2 * self.period_frames as usize;
         let (status, stop, thread) = self.spawn("mock-capture", &dev, rate, move |buf, info| {
             {
                 let mut sh = lock(&shared);
@@ -304,13 +321,35 @@ impl AudioBackend for MockBackend {
                             *s = amp * (2.0 * std::f64::consts::PI * phase).sin() as f32;
                         }
                     }
-                    MockSignal::Loopback { delay_frames } => {
-                        if !air_primed {
-                            air.extend(std::iter::repeat_n(0.0, delay_frames));
-                            air_primed = true;
+                    MockSignal::Loopback { .. } => {
+                        // Grow/shrink the delay line to the requested delay.
+                        let want = sh.air_delay;
+                        while air.len() < want {
+                            air.push_front(0.0);
                         }
+                        while air.len() > want {
+                            air.pop_front();
+                        }
+                        // Jitter buffer: wait for `slack` frames once, then
+                        // take one frame per frame; frames that were late
+                        // are replaced by silence and dropped on arrival, so
+                        // the loopback delay stays constant.
+                        if !primed && sh.loopback.len() >= slack {
+                            primed = true;
+                        }
+                        let skip = debt.min(sh.loopback.len());
+                        sh.loopback.drain(..skip);
+                        debt -= skip;
                         for s in buf.iter_mut() {
-                            air.push_back(sh.loopback.pop_front().unwrap_or(0.0));
+                            let v = if primed {
+                                sh.loopback.pop_front().unwrap_or_else(|| {
+                                    debt += 1;
+                                    0.0
+                                })
+                            } else {
+                                0.0
+                            };
+                            air.push_back(v);
                             *s = air.pop_front().unwrap_or(0.0);
                         }
                     }
