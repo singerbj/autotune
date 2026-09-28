@@ -142,8 +142,8 @@ jobs:
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
         with:
-          shared-key: windows-release
-      - run: cargo test -p tuner-dsp --release --locked --test no_alloc -- --ignored soak
+          shared-key: windows-soak
+      - run: cargo test -p tuner-dsp --profile soak --locked --test no_alloc -- --ignored soak
 
   licenses:
     name: License + advisory audit
@@ -172,7 +172,7 @@ jobs:
         shell: pwsh
         run: |
           Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
-          $issues = Invoke-ScriptAnalyzer -Path installer, scripts -Recurse -Severity Error, Warning -ExcludeRule PSAvoidUsingWriteHost
+          $issues = foreach ($p in 'installer', 'scripts') { Invoke-ScriptAnalyzer -Path $p -Recurse -Severity Error, Warning -ExcludeRule PSAvoidUsingWriteHost }
           $issues | Format-Table -AutoSize
           if ($issues) { exit 1 }
       - name: Pester

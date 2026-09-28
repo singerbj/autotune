@@ -23,7 +23,7 @@ npm run dev -w ui    # UI only, in a browser, against an in-memory mock
 | `npm run bindings` | Regenerate `ui/src/bindings.ts` from the Rust commands |
 | `cargo run -p tuner-cli -- tune -i in.wav -o out.wav --key A --scale minor` | Offline DSP |
 | `cargo bench -p tuner-dsp` | NFR-03 benchmark |
-| `cargo test -p tuner-dsp --release -- --ignored soak` | 1-hour offline soak |
+| `cargo test -p tuner-dsp --profile soak --test no_alloc -- --ignored soak` | 1-hour offline soak |
 | `UPDATE_GOLDEN=1 cargo test -p tuner-cli --test golden` | Regenerate golden files after an intended DSP change |
 
 ## Git hooks (lefthook)

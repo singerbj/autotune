@@ -1,7 +1,9 @@
 //! Hard rule: `process()` never allocates. The soak test runs the equivalent
 //! of one hour of audio under `assert_no_alloc` (run with `--ignored`, in
-//! release mode, in CI).
+//! the optimised `soak` profile, in CI).
 
+// `assert_no_alloc` is a no-op without debug assertions; use the `soak` profile.
+#![cfg(debug_assertions)]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use assert_no_alloc::{assert_no_alloc, AllocDisabler};
@@ -79,7 +81,7 @@ fn process_does_not_allocate() {
 /// Architecture › Automated tests: "A soak test runs process() offline for the
 /// equivalent of 1 hour with assert_no_alloc enabled."
 #[test]
-#[ignore = "long: run with `cargo test --release -- --ignored soak`"]
+#[ignore = "long: run with `cargo test --profile soak -- --ignored soak`"]
 fn soak_one_hour_no_alloc() {
     run_seconds(3600);
 }

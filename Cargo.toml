@@ -54,5 +54,12 @@ codegen-units = 1
 panic = "abort"
 strip = "symbols"
 
+# Optimised, but with debug assertions so `assert_no_alloc` stays active
+# (it compiles to a no-op in plain release builds). Used by the CI soak.
+[profile.soak]
+inherits = "release"
+debug-assertions = true
+panic = "unwind"
+
 [profile.bench]
 debug = true

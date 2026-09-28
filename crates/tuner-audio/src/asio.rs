@@ -190,8 +190,20 @@ fn keeper(
         default.sample_rate().0
     };
 
+    // Ask for 64 frames when the driver allows it, else its closest size.
+    let buffer = match default.buffer_size() {
+        cpal::SupportedBufferSize::Range { min, max } => {
+            BufferSize::Fixed(ASIO_PERIOD.clamp(*min, (*max).max(*min)))
+        }
+        cpal::SupportedBufferSize::Unknown => BufferSize::Default,
+    };
+    let period = match buffer {
+        BufferSize::Fixed(n) => n,
+        BufferSize::Default => ASIO_PERIOD,
+    };
+
     let (mut cb_tx, mut cb_rx) = rtrb::RingBuffer::<Box<dyn CaptureCallback>>::new(1);
-    let mut build = |buffer: BufferSize, st: Arc<StreamStatus>| {
+    let build = |buffer: BufferSize, st: Arc<StreamStatus>| {
         let config = StreamConfig {
             channels,
             sample_rate: cpal::SampleRate(rate),
@@ -251,9 +263,7 @@ fn keeper(
             None,
         )
     };
-    let stream = match build(BufferSize::Fixed(ASIO_PERIOD), status.clone())
-        .or_else(|_| build(BufferSize::Default, status.clone()))
-    {
+    let stream = match build(buffer, status.clone()) {
         Ok(s) => s,
         Err(e) => return fail(AudioError::TierUnavailable(leak(e.to_string())), cb),
     };
@@ -272,7 +282,7 @@ fn keeper(
         tier: BackendTier::Asio,
         sample_rate: rate,
         channels,
-        period_frames: ASIO_PERIOD,
+        period_frames: period,
         stream_latency_frames: 0,
         fallbacks: vec![],
     }));
