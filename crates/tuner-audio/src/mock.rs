@@ -240,7 +240,10 @@ impl MockBackend {
                     let now = Instant::now();
                     if next > now {
                         std::thread::sleep(next - now);
-                    } else {
+                    } else if now - next > Duration::from_millis(100) {
+                        // Far behind (debugger, overloaded CI): resync
+                        // instead of bursting. Small lags are caught up so
+                        // the average rate stays exact.
                         next = now;
                     }
                 }

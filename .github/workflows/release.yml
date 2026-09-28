@@ -1,0 +1,215 @@
+# Release pipeline (FR-22, M6).
+#
+# Two ways in:
+#   * Actions → Release → Run workflow with a version: bumps versions, commits,
+#     tags and releases in one run (tags pushed with GITHUB_TOKEN do not start
+#     new workflow runs, so everything happens here).
+#   * Push a tag `vX.Y.Z` whose version matches Cargo.toml.
+#
+# Output: a GitHub Release with the signed NSIS installer, its updater
+# signature and `latest.json`. Installed apps poll
+# https://github.com/<owner>/<repo>/releases/latest/download/latest.json
+# and update themselves. See docs/RELEASING.md for the one-time secrets.
+
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. 1.4.0 or 1.4.0-beta.1)"
+        required: true
+      prerelease:
+        description: "Mark as a pre-release (installed apps will not auto-update to it)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  prepare:
+    name: Prepare version and tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - run: rustup show active-toolchain || rustup toolchain install
+      - name: Resolve version
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            version="${INPUT_VERSION#v}"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          if ! echo "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::'$version' is not a semantic version"; exit 1
+          fi
+          pre=false
+          if [ "$INPUT_PRERELEASE" = "true" ] || echo "$version" | grep -q -- '-'; then pre=true; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
+      - name: Bump, commit and tag (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          ./scripts/set-version.sh "$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(release): v$VERSION"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin HEAD "v$VERSION"
+      - name: Tag matches Cargo.toml (tag pushes)
+        if: github.event_name == 'push'
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          cargo_version=$(sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\(.*\)"/\1/p}' Cargo.toml)
+          if [ "$cargo_version" != "$VERSION" ]; then
+            echo "::error::Tag v$VERSION does not match Cargo.toml version $cargo_version. Use the Release workflow's 'Run workflow' to bump versions."
+            exit 1
+          fi
+
+  build:
+    name: Build, sign and upload (windows)
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-release
+      - run: npm ci
+
+      - name: Configure updater public key
+        shell: pwsh
+        env:
+          PUBKEY: ${{ vars.TAURI_UPDATER_PUBKEY }}
+          SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if (-not $env:PUBKEY -or -not $env:SIGNING_KEY) {
+            Write-Output "::error::Set the TAURI_UPDATER_PUBKEY variable and TAURI_SIGNING_PRIVATE_KEY secret (docs/RELEASING.md)."
+            exit 1
+          }
+          $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $conf.plugins.updater.pubkey = $env:PUBKEY
+          $conf | ConvertTo-Json -Depth 32 | Set-Content src-tauri/tauri.conf.json -Encoding utf8
+
+      - name: Import code-signing certificate (optional)
+        shell: pwsh
+        env:
+          CERT_PFX: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:CERT_PFX) {
+            Write-Output "::warning::WINDOWS_CERTIFICATE not set; the installer will be unsigned (SmartScreen will warn)."
+            '{}' | Set-Content signing.conf.json
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERT_PFX))
+          $pw = ConvertTo-SecureString $env:CERT_PASSWORD -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $pw
+          Remove-Item $pfx
+          @{ bundle = @{ windows = @{ certificateThumbprint = $cert.Thumbprint } } } |
+            ConvertTo-Json -Depth 8 | Set-Content signing.conf.json
+
+      - name: Bundle VB-Cable driver pack (licensed builds only)
+        if: vars.BUNDLE_VBCABLE == 'true'
+        shell: pwsh
+        run: |
+          $dest = 'installer/resources/vbcable'
+          New-Item -ItemType Directory -Force $dest | Out-Null
+          Invoke-WebRequest -Uri 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip' -OutFile vbcable.zip -UseBasicParsing
+          Expand-Archive vbcable.zip -DestinationPath $dest -Force
+          $sig = Get-AuthenticodeSignature "$dest/VBCABLE_Setup_x64.exe"
+          if ($sig.Status -ne 'Valid') { throw "VB-Cable setup signature is $($sig.Status)" }
+
+      - name: Create draft release
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          args=(--draft --generate-notes --title "Voice Tuner $TAG")
+          if [ "$PRERELEASE" = "true" ]; then args+=(--prerelease); fi
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --verify-tag "${args[@]}"
+          fi
+          echo "id=$(gh release view "$TAG" --json databaseId --jq .databaseId)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and upload with tauri-action
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ steps.release.outputs.id }}
+          args: --config signing.conf.json
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          retryAttempts: 2
+
+  publish:
+    name: Publish release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Verify assets
+        run: |
+          assets=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          echo "$assets"
+          echo "$assets" | grep -q 'latest.json' || { echo "::error::latest.json missing"; exit 1; }
+          echo "$assets" | grep -q -- '-setup.exe$' || { echo "::error::installer missing"; exit 1; }
+          echo "$assets" | grep -q -- '-setup.exe.sig$' || { echo "::error::updater signature missing"; exit 1; }
+      - name: Publish (becomes "latest" unless pre-release)
+        env:
+          PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          if [ "$PRERELEASE" = "true" ]; then
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+          else
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          fi

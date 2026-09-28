@@ -1,0 +1,9 @@
+* text=auto eol=lf
+*.wav binary
+*.png binary
+*.ico binary
+*.nsh text eol=crlf
+*.ps1 text eol=crlf
+ui/src/bindings.ts linguist-generated=true
+Cargo.lock linguist-generated=true
+package-lock.json linguist-generated=true
