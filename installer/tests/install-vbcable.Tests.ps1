@@ -28,10 +28,10 @@ Describe 'Invoke-Install (FR-15)' {
         Mock Get-DriverPack { 'C:\pack\VBCABLE_Setup_x64.exe' }
         Mock Add-VBAudioTrustedPublisher { }
         Mock Invoke-Setup { 0 }
-        Mock Set-Marker { }
+        Mock Save-Marker { }
         Invoke-Install | Should -Be 3010
         Should -Invoke Invoke-Setup -Times 1 -ParameterFilter { $Arguments -contains '-i' -and $Arguments -contains '-h' }
-        Should -Invoke Set-Marker -Times 1 -ParameterFilter { $Installed -eq $true }
+        Should -Invoke Save-Marker -Times 1 -ParameterFilter { $Installed -eq $true }
     }
 }
 
@@ -47,7 +47,7 @@ Describe 'Invoke-Uninstall' {
         Mock Test-Marker { $true }
         Mock Test-Path { $true }
         Mock Invoke-Setup { 0 }
-        Mock Set-Marker { }
+        Mock Save-Marker { }
         Invoke-Uninstall | Should -Be 3010
         Should -Invoke Invoke-Setup -Times 1 -ParameterFilter { $Arguments -contains '-u' }
     }

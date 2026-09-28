@@ -24,6 +24,9 @@
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File install-vbcable.ps1 -Action Install -PackDir C:\x -DryRun
 #>
+# Script parameters are read inside the functions below; PSScriptAnalyzer
+# cannot see that across scopes.
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '', Justification = 'Used by functions in this script')]
 [CmdletBinding()]
 param(
     [ValidateSet('Install', 'Uninstall', 'Detect')]
@@ -39,10 +42,11 @@ $ErrorActionPreference = 'Stop'
 $SetupName = 'VBCABLE_Setup_x64.exe'
 $LogFile = Join-Path $env:TEMP 'voice-tuner-vbcable.log'
 
-function Write-Log([string] $Message) {
+function Write-VtLog([string] $Message) {
     $line = '{0:u} {1}' -f (Get-Date), $Message
     Write-Output $line
-    try { Add-Content -Path $LogFile -Value $line -ErrorAction SilentlyContinue } catch { }
+    try { Add-Content -Path $LogFile -Value $line -ErrorAction Stop }
+    catch { Write-Verbose "could not write ${LogFile}: $_" }
 }
 
 function Test-VBCableInstalled {
@@ -70,7 +74,7 @@ function Test-TrustedVBAudioSignature([string] $Path) {
 function Get-DriverPack {
     $setup = Join-Path $PackDir $SetupName
     if (Test-Path $setup) { return $setup }
-    Write-Log "Driver pack not bundled; downloading $DownloadUrl"
+    Write-VtLog "Driver pack not bundled; downloading $DownloadUrl"
     if ($DryRun) { return $setup }
     New-Item -ItemType Directory -Force -Path $PackDir | Out-Null
     $zip = Join-Path $env:TEMP 'VBCABLE_Driver_Pack.zip'
@@ -93,7 +97,7 @@ function Add-VBAudioTrustedPublisher([string] $Dir) {
             $sig = Get-AuthenticodeSignature -FilePath $f.FullName
             $cert = $sig.SignerCertificate
             if ($sig.Status -eq 'Valid' -and $cert -and $cert.Subject -match 'VB-Audio|Burel') {
-                Write-Log "Trusting publisher $($cert.Subject) ($($cert.Thumbprint))"
+                Write-VtLog "Trusting publisher $($cert.Subject) ($($cert.Thumbprint))"
                 if (-not $DryRun) { $store.Add($cert) }
             }
         }
@@ -101,8 +105,8 @@ function Add-VBAudioTrustedPublisher([string] $Dir) {
     finally { $store.Close() }
 }
 
-function Set-Marker([bool] $Installed) {
-    if ($DryRun) { Write-Log "Would set InstalledVBCable=$Installed at $RegistryKey"; return }
+function Save-Marker([bool] $Installed) {
+    if ($DryRun) { Write-VtLog "Would set InstalledVBCable=$Installed at $RegistryKey"; return }
     if ($Installed) {
         New-Item -Path $RegistryKey -Force | Out-Null
         New-ItemProperty -Path $RegistryKey -Name 'InstalledVBCable' -PropertyType DWord -Value 1 -Force | Out-Null
@@ -118,32 +122,32 @@ function Test-Marker {
 }
 
 function Invoke-Setup([string] $Setup, [string[]] $Arguments) {
-    Write-Log "Running $Setup $($Arguments -join ' ')"
+    Write-VtLog "Running $Setup $($Arguments -join ' ')"
     if ($DryRun) { return 0 }
     $p = Start-Process -FilePath $Setup -ArgumentList $Arguments -Wait -PassThru -WindowStyle Hidden
     return $p.ExitCode
 }
 
 function Invoke-Install {
-    if (Test-VBCableInstalled) { Write-Log 'VB-Cable already installed.'; return 0 }
+    if (Test-VBCableInstalled) { Write-VtLog 'VB-Cable already installed.'; return 0 }
     $setup = Get-DriverPack
     if (-not $DryRun -and -not (Test-TrustedVBAudioSignature $setup)) {
         throw "$setup is not signed by VB-Audio; refusing to run it"
     }
     Add-VBAudioTrustedPublisher (Split-Path $setup)
     $code = Invoke-Setup $setup @('-i', '-h')
-    Write-Log "VB-Cable setup exited with $code"
-    Set-Marker $true
+    Write-VtLog "VB-Cable setup exited with $code"
+    Save-Marker $true
     return 3010
 }
 
 function Invoke-Uninstall {
-    if (-not (Test-Marker)) { Write-Log 'VB-Cable was not installed by Voice Tuner; leaving it.'; return 0 }
+    if (-not (Test-Marker)) { Write-VtLog 'VB-Cable was not installed by Voice Tuner; leaving it.'; return 0 }
     $setup = Join-Path $PackDir $SetupName
     if (-not (Test-Path $setup)) { $setup = Get-DriverPack }
     $code = Invoke-Setup $setup @('-u', '-h')
-    Write-Log "VB-Cable removal exited with $code"
-    Set-Marker $false
+    Write-VtLog "VB-Cable removal exited with $code"
+    Save-Marker $false
     return 3010
 }
 
@@ -156,7 +160,7 @@ if ($MyInvocation.InvocationName -ne '.') {
         }
     }
     catch {
-        Write-Log "ERROR: $_"
+        Write-VtLog "ERROR: $_"
         exit 1
     }
 }
