@@ -1,0 +1,21 @@
+[package]
+name = "tuner-cli"
+description = "Headless harness: offline WAV tuning, pitch tracks, test signals, soak runs."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "tuner-cli"
+path = "src/main.rs"
+
+[dependencies]
+tuner-dsp.workspace = true
+hound.workspace = true
+clap.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

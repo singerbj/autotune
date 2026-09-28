@@ -1,0 +1,27 @@
+[package]
+name = "tuner-engine"
+description = "Real-time engine: capture+DSP, monitor and cable render threads, live params, meters, latency test, device recovery."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+serde = ["dep:serde", "tuner-dsp/serde", "tuner-audio/serde"]
+specta = ["dep:specta", "tuner-dsp/specta", "tuner-audio/specta"]
+
+[dependencies]
+tuner-dsp.workspace = true
+tuner-audio.workspace = true
+thiserror.workspace = true
+rtrb.workspace = true
+triple_buffer.workspace = true
+realfft.workspace = true
+assert_no_alloc.workspace = true
+serde = { workspace = true, optional = true }
+specta = { workspace = true, optional = true }
+
+[lints]
+workspace = true
