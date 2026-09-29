@@ -1,0 +1,10 @@
+/target
+node_modules/
+/ui/dist
+/src-tauri/gen/schemas
+*.log
+.DS_Store
+/installer/vbcable/*.exe
+/installer/vbcable/*.zip
+!/installer/vbcable/README.md
+/src-tauri/gen

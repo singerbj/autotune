@@ -1,0 +1,22 @@
+name: Bug report
+description: Something doesn't sound or behave right
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Diagnostics tab → "Copy diagnostics", then paste here.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: devices
+    attributes:
+      label: Microphone / headphones / interface

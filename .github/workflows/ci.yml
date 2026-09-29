@@ -1,0 +1,226 @@
+# PR checks and main-branch CI.
+#
+# Every job maps to a rule in REQUIREMENTS.md; `ci-success` aggregates them so
+# branch protection only needs one required check.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
+  # Portable crates: everything below the Tauri app.
+  CORE_CRATES: -p tuner-dsp -p tuner-cli -p tuner-audio -p tuner-engine -p tuner-win
+
+jobs:
+  pr-title:
+    name: PR title (Conventional Commits)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  frontend:
+    name: Frontend (oxlint, oxfmt, tsc, Vitest, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check -w ui
+      - run: npm run build -w ui
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ui-dist
+          path: ui/dist
+          retention-days: 3
+
+  rust-lint:
+    name: Rust fmt + clippy (windows)
+    needs: frontend
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: ui-dist
+          path: ui/dist
+      - name: Install toolchain (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-debug
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  rust-test:
+    name: Rust tests + bindings (windows)
+    needs: frontend
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: ui-dist
+          path: ui/dist
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-debug
+      - run: cargo test --workspace --locked
+      - name: tauri-specta bindings are up to date
+        shell: bash
+        run: |
+          if ! git diff --exit-code -- ui/src/bindings.ts; then
+            echo "::error file=ui/src/bindings.ts::Generated bindings are stale. Run 'npm run bindings' and commit the result."
+            exit 1
+          fi
+
+  rust-portable:
+    name: Core crates (linux, mock backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy $CORE_CRATES --all-targets --locked -- -D warnings
+      - run: cargo test $CORE_CRATES --locked
+
+  asio:
+    name: ASIO backend builds (feature `asio`)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-asio
+      # asio-sys downloads the Steinberg SDK and runs bindgen (LLVM is on the image).
+      - run: cargo clippy -p tuner-audio -p tuner-engine --features tuner-audio/asio --all-targets --locked -- -D warnings
+
+  bench-gate:
+    name: NFR-03 benchmark gate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-bench
+      - run: cargo bench -p tuner-dsp --bench process --locked -- --warm-up-time 2 --measurement-time 5 --noplot
+      - name: 128-sample block < 0.27 ms
+        shell: pwsh
+        run: ./scripts/bench-gate.ps1 -BudgetNs 270000
+
+  soak:
+    name: 1-hour offline soak under assert_no_alloc
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-soak
+      - run: cargo test -p tuner-dsp --profile soak --locked --test no_alloc -- --ignored soak
+
+  licenses:
+    name: License + advisory audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+          rust-version: "1.94.1"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: npm license check
+        run: npx --yes license-checker-rseidelsohn@5 --production --excludePrivatePackages --onlyAllow "MIT;ISC;Apache-2.0;BSD-2-Clause;BSD-3-Clause;0BSD;BlueOak-1.0.0;CC0-1.0;Unlicense;MIT-0;Python-2.0;CC-BY-4.0"
+
+  installer-scripts:
+    name: Installer scripts (PSScriptAnalyzer + Pester)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Lint
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $issues = foreach ($p in 'installer', 'scripts') { Invoke-ScriptAnalyzer -Path $p -Recurse -Severity Error, Warning -ExcludeRule PSAvoidUsingWriteHost }
+          $issues | Format-Table -AutoSize
+          if ($issues) { exit 1 }
+      - name: Pester
+        shell: pwsh
+        run: |
+          Install-Module Pester -MinimumVersion 5.5 -Force -Scope CurrentUser -SkipPublisherCheck
+          $cfg = New-PesterConfiguration
+          $cfg.Run.Path = 'installer/tests'
+          $cfg.Run.Exit = $true
+          $cfg.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $cfg
+
+  package:
+    name: Build installer + install/uninstall smoke test
+    needs: [rust-lint, rust-test]
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: windows-release
+      - run: npm ci
+      - name: Build unsigned NSIS installer
+        run: npx tauri build --ci --config src-tauri/tauri.ci.conf.json
+      - name: Smoke test install / uninstall
+        shell: pwsh
+        run: ./scripts/installer-smoke-test.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installer-${{ github.sha }}
+          path: target/release/bundle/nsis/*.exe
+          retention-days: 14
+
+  ci-success:
+    name: CI success
+    if: always()
+    needs: [pr-title, frontend, rust-lint, rust-test, rust-portable, asio, bench-gate, soak, licenses, installer-scripts, package]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs passed
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -qE '"(failure|cancelled)"'; then exit 1; fi

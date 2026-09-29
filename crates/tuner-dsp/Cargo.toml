@@ -1,0 +1,30 @@
+[package]
+name = "tuner-dsp"
+description = "Real-time pitch detection, scale snapping and PSOLA pitch shifting. Pure Rust, no OS dependencies."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+serde = ["dep:serde"]
+specta = ["dep:specta"]
+
+[dependencies]
+realfft.workspace = true
+thiserror.workspace = true
+serde = { workspace = true, optional = true }
+specta = { workspace = true, optional = true }
+
+[dev-dependencies]
+assert_no_alloc.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "process"
+harness = false
+
+[lints]
+workspace = true

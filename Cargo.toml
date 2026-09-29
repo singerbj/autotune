@@ -1,0 +1,65 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/tuner-dsp",
+    "crates/tuner-audio",
+    "crates/tuner-engine",
+    "crates/tuner-win",
+    "crates/tuner-cli",
+    "src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "UNLICENSED"
+repository = "https://github.com/singerbj/tunedup"
+authors = ["Ben Singer"]
+
+[workspace.dependencies]
+tuner-dsp = { path = "crates/tuner-dsp" }
+tuner-audio = { path = "crates/tuner-audio" }
+tuner-engine = { path = "crates/tuner-engine" }
+tuner-win = { path = "crates/tuner-win" }
+
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+rtrb = "0.3"
+triple_buffer = "9"
+rubato = { version = "0.16", default-features = false }
+realfft = "3"
+assert_no_alloc = "1.1"
+hound = "3.5"
+criterion = "0.5"
+tracing = "0.1"
+tempfile = "3"
+clap = { version = "4", features = ["derive"] }
+windows = "0.62"
+windows-core = "0.62"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+undocumented_unsafe_blocks = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+
+# Optimised, but with debug assertions so `assert_no_alloc` stays active
+# (it compiles to a no-op in plain release builds). Used by the CI soak.
+[profile.soak]
+inherits = "release"
+debug-assertions = true
+panic = "unwind"
+
+[profile.bench]
+debug = true

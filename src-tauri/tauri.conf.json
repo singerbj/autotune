@@ -1,0 +1,79 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "TunedUp",
+  "mainBinaryName": "tunedup",
+  "identifier": "io.github.singerbj.tunedup",
+  "build": {
+    "beforeDevCommand": "npm run dev -w ui",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build -w ui",
+    "frontendDist": "../ui/dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "TunedUp",
+        "width": 1120,
+        "height": 780,
+        "minWidth": 920,
+        "minHeight": 640,
+        "visible": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost",
+      "freezePrototype": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "publisher": "Ben Singer",
+    "copyright": "© 2026 Ben Singer",
+    "category": "Music",
+    "shortDescription": "Real-time voice tuner",
+    "longDescription": "Pitch-corrects your microphone in real time, monitors it in your headphones, and exposes it to Discord and other apps through VB-Cable.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "createUpdaterArtifacts": true,
+    "resources": {
+      "../installer/resources/": "installer/"
+    },
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com",
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "perMachine",
+        "installerHooks": "../installer/nsis/hooks.nsh",
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false,
+        "startMenuFolder": "TunedUp"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "UPDATER_PUBKEY_PLACEHOLDER",
+      "endpoints": [
+        "https://github.com/singerbj/tunedup/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
