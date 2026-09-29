@@ -23,7 +23,7 @@ serde = { workspace = true, optional = true }
 specta = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]
-cpal = { version = "0.16", optional = true }
+cpal = { version = "0.18", optional = true }
 windows = { workspace = true, features = [
     "Win32_Foundation",
     "Win32_Media_Audio",
