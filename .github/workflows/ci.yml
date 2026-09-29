@@ -168,17 +168,31 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Install PSScriptAnalyzer and Pester
+        shell: pwsh
+        run: |
+          # PSGallery lookups fail intermittently ("No match was found"); retry.
+          foreach ($m in @(@{ Name = 'PSScriptAnalyzer'; Min = '1.0' }, @{ Name = 'Pester'; Min = '5.5' })) {
+            for ($i = 1; $i -le 4; $i++) {
+              try {
+                Install-Module $m.Name -MinimumVersion $m.Min -Force -Scope CurrentUser -SkipPublisherCheck -ErrorAction Stop
+                break
+              } catch {
+                if ($i -eq 4) { throw }
+                Write-Output "Install-Module $($m.Name) failed (attempt $i): $_; retrying"
+                Start-Sleep -Seconds (5 * $i)
+              }
+            }
+          }
       - name: Lint
         shell: pwsh
         run: |
-          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
           $issues = foreach ($p in 'installer', 'scripts') { Invoke-ScriptAnalyzer -Path $p -Recurse -Severity Error, Warning -ExcludeRule PSAvoidUsingWriteHost }
           $issues | Format-Table -AutoSize
           if ($issues) { exit 1 }
       - name: Pester
         shell: pwsh
         run: |
-          Install-Module Pester -MinimumVersion 5.5 -Force -Scope CurrentUser -SkipPublisherCheck
           $cfg = New-PesterConfiguration
           $cfg.Run.Path = 'installer/tests'
           $cfg.Run.Exit = $true
