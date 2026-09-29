@@ -44,10 +44,11 @@ Describe 'Cleanup' {
     }
     It 'removes TunedUp''s startup entries and nothing else' {
         Invoke-UserRegistry @('-Action', 'Cleanup') | Should -Be 0
-        (Get-ItemProperty (Join-Path $Cv 'RunOnce')).PSObject.Properties.Name | Should -Not -Contain 'TunedUpSetup'
-        (Get-ItemProperty (Join-Path $Cv 'Run')).PSObject.Properties.Name | Should -Not -Contain 'TunedUp'
+        # Value names via Get-Item: an emptied key has no properties for Get-ItemProperty.
+        @((Get-Item (Join-Path $Cv 'RunOnce')).Property) -contains 'TunedUpSetup' | Should -BeFalse
+        @((Get-Item (Join-Path $Cv 'Run')).Property) -contains 'TunedUp' | Should -BeFalse
         (Get-ItemProperty (Join-Path $Cv 'Run')).OtherApp | Should -Be 'y'
-        (Get-ItemProperty (Join-Path $Cv 'Explorer\StartupApproved\Run')).PSObject.Properties.Name | Should -Not -Contain 'TunedUp'
+        @((Get-Item (Join-Path $Cv 'Explorer\StartupApproved\Run')).Property) -contains 'TunedUp' | Should -BeFalse
     }
     It 'succeeds when there is nothing to remove' {
         Invoke-UserRegistry @('-Action', 'Cleanup') | Should -Be 0
@@ -58,7 +59,8 @@ Describe 'Cleanup' {
 Describe 'Get-SessionUserSid' {
     It 'is the owner of explorer.exe in this session' {
         Mock Get-CimInstance { [pscustomobject]@{ Name = 'explorer.exe' } } -ParameterFilter { $ClassName -eq 'Win32_Process' }
-        Mock Invoke-CimMethod { [pscustomobject]@{ ReturnValue = 0; Sid = 'S-1-5-21-9-9-9-1001' } }
+        # The fake process isn't a CimInstance, so drop the parameter's type.
+        Mock Invoke-CimMethod { [pscustomobject]@{ ReturnValue = 0; Sid = 'S-1-5-21-9-9-9-1001' } } -RemoveParameterType InputObject
         Get-SessionUserSid | Should -Be 'S-1-5-21-9-9-9-1001'
     }
     It 'resolves to a real SID on this machine (when anyone is signed in)' {
