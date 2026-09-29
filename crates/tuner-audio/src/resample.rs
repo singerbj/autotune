@@ -11,7 +11,8 @@
 //! Everything is allocated at construction; `read` is real-time safe.
 
 use rtrb::Consumer;
-use rubato::{FastFixedOut, PolynomialDegree, Resampler};
+use rubato::audioadapter_buffers::direct::InterleavedSlice;
+use rubato::{Adjustable, Async, FixedAsync, PolynomialDegree, Resampler};
 
 use crate::types::AudioError;
 
@@ -33,7 +34,7 @@ pub struct ReadReport {
 enum Mode {
     Direct,
     Resampled {
-        rs: Box<FastFixedOut<f32>>,
+        rs: Box<Async<f32>>,
         in_buf: Vec<f32>,
         out_buf: Vec<f32>,
         out_pos: usize,
@@ -95,12 +96,13 @@ impl RingReader {
         target: usize,
     ) -> Result<Self, AudioError> {
         let ratio = f64::from(out_rate) / f64::from(in_rate.max(1));
-        let rs = FastFixedOut::<f32>::new(
+        let rs = Async::<f32>::new_poly(
             ratio,
             1.0 + 2.0 * MAX_REL,
             PolynomialDegree::Cubic,
             CHUNK,
             1,
+            FixedAsync::Output,
         )
         .map_err(|e| AudioError::Thread(format!("resampler: {e}")))?;
         let in_max = rs.input_frames_max();
@@ -237,16 +239,19 @@ impl RingReader {
                             break;
                         }
                         Self::pop_into(&mut self.rx, &mut in_buf[..need]);
-                        match rs.process_into_buffer(
-                            &[&in_buf[..need]],
-                            &mut [&mut out_buf[..]],
-                            None,
-                        ) {
-                            Ok((_, produced)) => {
+                        let out_frames = out_buf.len();
+                        let res =
+                            InterleavedSlice::new(&in_buf[..need], 1, need).and_then(|input| {
+                                let mut output =
+                                    InterleavedSlice::new_mut(&mut out_buf[..], 1, out_frames)?;
+                                Ok(rs.process_into_buffer(&input, &mut output, None))
+                            });
+                        match res {
+                            Ok(Ok((_, produced))) => {
                                 *out_len = produced;
                                 *out_pos = 0;
                             }
-                            Err(_) => {
+                            _ => {
                                 out[i..].fill(0.0);
                                 report.underrun = true;
                                 break;

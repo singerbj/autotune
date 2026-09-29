@@ -39,6 +39,11 @@ fn host() -> Result<cpal::Host, AudioError> {
         .map_err(|e| AudioError::TierUnavailable(leak(e.to_string())))
 }
 
+/// cpal names an ASIO device after its driver (the `HKLM\SOFTWARE\ASIO` key).
+fn driver_name(d: &cpal::Device) -> Option<String> {
+    d.description().ok().map(|desc| desc.name().to_owned())
+}
+
 /// ASIO errors are rare and few; leaking their text keeps `AudioError`
 /// `'static` without allocating on any audio path.
 fn leak(s: String) -> &'static str {
@@ -57,7 +62,7 @@ impl AsioHost {
         host()
             .ok()
             .and_then(|h| h.input_devices().ok())
-            .map(|it| it.filter_map(|d| d.name().ok()).collect())
+            .map(|it| it.filter_map(|d| driver_name(&d)).collect())
             .unwrap_or_default()
     }
 
@@ -165,7 +170,7 @@ fn keeper(
     let device = match host
         .input_devices()
         .ok()
-        .and_then(|mut it| it.find(|d| d.name().ok().as_deref() == Some(driver.as_str())))
+        .and_then(|mut it| it.find(|d| driver_name(d).as_deref() == Some(driver.as_str())))
     {
         Some(d) => d,
         None => return fail(AudioError::DeviceNotFound(driver), cb),
@@ -180,14 +185,14 @@ fn keeper(
         .supported_input_configs()
         .map(|mut it| {
             it.any(|r| {
-                r.min_sample_rate().0 <= preferred_rate && r.max_sample_rate().0 >= preferred_rate
+                r.min_sample_rate() <= preferred_rate && r.max_sample_rate() >= preferred_rate
             })
         })
         .unwrap_or(false)
     {
         preferred_rate
     } else {
-        default.sample_rate().0
+        default.sample_rate()
     };
 
     // Ask for 64 frames when the driver allows it, else its closest size.
@@ -206,7 +211,7 @@ fn keeper(
     let build = |buffer: BufferSize, st: Arc<StreamStatus>| {
         let config = StreamConfig {
             channels,
-            sample_rate: cpal::SampleRate(rate),
+            sample_rate: rate,
             buffer_size: buffer,
         };
         let mut engine_cb: Option<Box<dyn CaptureCallback>> = None;
@@ -218,7 +223,7 @@ fn keeper(
         };
         let st_err = st.clone();
         device.build_input_stream_raw(
-            &config,
+            config,
             format,
             move |data: &cpal::Data, _: &cpal::InputCallbackInfo| {
                 if engine_cb.is_none() {
@@ -254,9 +259,9 @@ fn keeper(
                 }
                 st.tick();
             },
-            move |err| {
-                st_err.set_state(match err {
-                    cpal::StreamError::DeviceNotAvailable => StreamState::DeviceLost,
+            move |err: cpal::Error| {
+                st_err.set_state(match err.kind() {
+                    cpal::ErrorKind::DeviceNotAvailable => StreamState::DeviceLost,
                     _ => StreamState::Failed,
                 });
             },
