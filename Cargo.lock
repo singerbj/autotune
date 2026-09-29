@@ -3722,9 +3722,9 @@ dependencies = [
 
 [[package]]
 name = "rtrb"
-version = "0.3.5"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fae8ee26b0371a29a77d2b2d6b3ae13aa81def6f9bf1b1b92a32d279a5e709b7"
+checksum = "9278fb35b3e730abe136e9b395b5b81b96d06b9f5478a50f0c8430a2237b22de"
 
 [[package]]
 name = "rubato"
@@ -5331,7 +5331,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tunedup"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "assert_no_alloc",
  "serde",
@@ -5360,7 +5360,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-audio"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "cpal",
  "rtrb",
@@ -5373,7 +5373,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-cli"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "clap",
  "hound",
@@ -5383,7 +5383,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-dsp"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "assert_no_alloc",
  "criterion",
@@ -5395,7 +5395,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-engine"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "assert_no_alloc",
  "realfft",
@@ -5410,7 +5410,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-win"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "serde",
  "serde_json",

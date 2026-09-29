@@ -9,11 +9,14 @@ updates:
     groups:
       tauri:
         patterns: ["tauri*", "specta*"]
-      windows:
-        patterns: ["windows*"]
       rust-minor:
         update-types: [minor, patch]
     ignore:
+      # Must stay on the same version Tauri uses (0.62 today) or two copies
+      # of the Windows bindings get linked and types stop matching. Bump
+      # them together with Tauri instead.
+      - dependency-name: windows
+      - dependency-name: windows-core
       # Pinned with `=` on purpose (beta; see tauri-specta docs).
       - dependency-name: specta
       - dependency-name: specta-typescript
