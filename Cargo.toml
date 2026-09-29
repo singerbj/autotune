@@ -38,7 +38,7 @@ tracing = "0.1"
 tempfile = "3"
 clap = { version = "4", features = ["derive"] }
 windows = "0.62"
-windows-core = "0.62"
+windows-core = "0.100"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
