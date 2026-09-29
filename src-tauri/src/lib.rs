@@ -86,26 +86,92 @@ pub fn export_bindings(path: &std::path::Path) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// `%APPDATA%` and `%LOCALAPPDATA%` of the person using TunedUp.
+#[derive(Debug, PartialEq, Eq)]
+struct UserDirs {
+    roaming: PathBuf,
+    local: PathBuf,
+    /// Elevated as another account: the dirs are the signed-in user's, not
+    /// this process's own.
+    other_user: bool,
+}
+
+impl UserDirs {
+    /// Normally this process's own folders. Elevated as another account
+    /// (Windows 11 Administrator Protection, over-the-shoulder elevation),
+    /// the signed-in user's instead, so the uninstaller's `--restore-defaults`
+    /// finds their routing backup and an elevated launch keeps their
+    /// settings, logs and a WebView2 profile they can write.
+    fn resolve(
+        other: Option<tuner_win::SignedInUser>,
+        env: impl Fn(&str) -> Option<std::ffi::OsString>,
+    ) -> Self {
+        if let Some(u) = other {
+            return Self {
+                roaming: u.roaming_app_data,
+                local: u.local_app_data,
+                other_user: true,
+            };
+        }
+        let roaming = env("APPDATA")
+            .map(PathBuf::from)
+            .or_else(|| env("XDG_CONFIG_HOME").map(PathBuf::from))
+            .or_else(|| env("HOME").map(|h| PathBuf::from(h).join(".config")))
+            .unwrap_or_else(std::env::temp_dir);
+        let local = env("LOCALAPPDATA")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| roaming.clone());
+        Self {
+            roaming,
+            local,
+            other_user: false,
+        }
+    }
+}
+
+fn user_dirs() -> &'static UserDirs {
+    static DIRS: std::sync::OnceLock<UserDirs> = std::sync::OnceLock::new();
+    DIRS.get_or_init(|| {
+        UserDirs::resolve(tuner_win::other_signed_in_user(), |n| std::env::var_os(n))
+    })
+}
+
 fn config_path() -> PathBuf {
     // %APPDATA%\<identifier>\config.json — matches Tauri's app_config_dir().
-    let base = std::env::var_os("APPDATA")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from))
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
-        .unwrap_or_else(std::env::temp_dir);
-    base.join(IDENTIFIER).join("config.json")
+    user_dirs().roaming.join(IDENTIFIER).join("config.json")
 }
 
 fn log_dir() -> PathBuf {
-    let base = std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
-            config_path()
-                .parent()
-                .map(PathBuf::from)
-                .unwrap_or_else(std::env::temp_dir)
-        });
-    base.join(IDENTIFIER).join("logs")
+    user_dirs().local.join(IDENTIFIER).join("logs")
+}
+
+/// The WebView2 profile folder when it must differ from Tauri's default
+/// (`%LOCALAPPDATA%\<identifier>` of this process's account): elevated as
+/// another account, WebView2 runs de-elevated as the signed-in user, who
+/// can't write that account's profile ("Microsoft Edge can't read and write
+/// to its data directory"). Use the signed-in user's own, i.e. the folder a
+/// normal launch uses.
+fn webview_data_dir() -> Option<PathBuf> {
+    let dirs = user_dirs();
+    dirs.other_user.then(|| dirs.local.join(IDENTIFIER))
+}
+
+/// The main window, from `tauri.conf.json` (`create: false` there so the
+/// WebView2 profile folder can be set first).
+fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
+    let Some(conf) = app.config().app.windows.iter().find(|w| w.label == "main") else {
+        return Ok(());
+    };
+    let mut builder = tauri::WebviewWindowBuilder::from_config(app, conf)?;
+    if let Some(dir) = webview_data_dir() {
+        tracing::info!(
+            "elevated as another account; WebView2 profile in {}",
+            dir.display()
+        );
+        builder = builder.data_directory(dir);
+    }
+    builder.build()?;
+    Ok(())
 }
 
 fn init_logging(dir: &std::path::Path) -> Option<tracing_appender::non_blocking::WorkerGuard> {
@@ -298,6 +364,7 @@ pub fn run() -> i32 {
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
             builder.mount_events(app);
+            create_main_window(app)?;
             let handle = app.handle().clone();
             tray::build(&handle)?;
 
@@ -339,6 +406,15 @@ pub fn run() -> i32 {
         Ok(a) => a,
         Err(e) => {
             tracing::error!("failed to start: {e}");
+            tuner_win::error_box(
+                "TunedUp couldn't start",
+                &format!(
+                    "TunedUp couldn't open its window: {e}\n\n\
+                     It needs the Microsoft Edge WebView2 Runtime, which Windows 10 and 11 \
+                     normally include. Install it from \
+                     https://go.microsoft.com/fwlink/p/?LinkId=2124703 and start TunedUp again."
+                ),
+            );
             return 1;
         }
     };
@@ -352,6 +428,51 @@ pub fn run() -> i32 {
 
 #[cfg(test)]
 mod tests {
+    use super::UserDirs;
+    use std::ffi::OsString;
+    use std::path::PathBuf;
+
+    fn env(name: &str) -> Option<OsString> {
+        match name {
+            "APPDATA" => Some(r"C:\Users\hidden-admin\AppData\Roaming".into()),
+            "LOCALAPPDATA" => Some(r"C:\Users\hidden-admin\AppData\Local".into()),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn user_dirs_are_this_accounts_own_normally() {
+        let d = UserDirs::resolve(None, env);
+        assert_eq!(
+            d.roaming,
+            PathBuf::from(r"C:\Users\hidden-admin\AppData\Roaming")
+        );
+        assert_eq!(
+            d.local,
+            PathBuf::from(r"C:\Users\hidden-admin\AppData\Local")
+        );
+        assert!(!d.other_user);
+    }
+
+    #[test]
+    fn user_dirs_are_the_signed_in_users_when_elevated_as_another_account() {
+        let user = tuner_win::SignedInUser {
+            sid: "S-1-5-21-1-2-3-1001".into(),
+            roaming_app_data: r"C:\Users\me\AppData\Roaming".into(),
+            local_app_data: r"C:\Users\me\AppData\Local".into(),
+        };
+        let d = UserDirs::resolve(Some(user), env);
+        assert_eq!(d.roaming, PathBuf::from(r"C:\Users\me\AppData\Roaming"));
+        assert_eq!(d.local, PathBuf::from(r"C:\Users\me\AppData\Local"));
+        assert!(d.other_user);
+    }
+
+    #[test]
+    fn local_falls_back_to_roaming() {
+        let d = UserDirs::resolve(None, |n| (n == "APPDATA").then(|| "/cfg".into()));
+        assert_eq!(d.local, PathBuf::from("/cfg"));
+    }
+
     /// Regenerates `ui/src/bindings.ts`; CI fails if the committed file differs.
     #[test]
     fn export_bindings() {
