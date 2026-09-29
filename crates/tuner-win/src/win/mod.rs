@@ -1,5 +1,6 @@
 //! Windows implementations.
 
+pub(crate) mod account;
 pub(crate) mod notify;
 pub(crate) mod policy;
 pub(crate) mod sessions;

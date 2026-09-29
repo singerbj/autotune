@@ -19,7 +19,7 @@ $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait -PassT
 if ($p.ExitCode -ne 0) { throw "Installer exited with $($p.ExitCode)" }
 
 $exe = Join-Path $InstallDir 'tunedup.exe'
-foreach ($path in @($exe, (Join-Path $InstallDir 'uninstall.exe'), (Join-Path $InstallDir 'installer\install-vbcable.ps1'))) {
+foreach ($path in @($exe, (Join-Path $InstallDir 'uninstall.exe'), (Join-Path $InstallDir 'installer\install-vbcable.ps1'), (Join-Path $InstallDir 'installer\user-registry.ps1'))) {
     if (-not (Test-Path $path)) { throw "Missing after install: $path" }
 }
 $uninstallKey = Get-ChildItem 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall' -ErrorAction SilentlyContinue |

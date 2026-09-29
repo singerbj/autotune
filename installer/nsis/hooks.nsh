@@ -7,8 +7,14 @@
 ; Install:   silently install VB-Cable if missing (one UAC prompt - the
 ;            installer itself is per-machine/elevated), record that we did,
 ;            and ask for one reboot that reopens the app in the setup wizard.
-; Uninstall: restore the user's default microphone, then offer to remove
-;            VB-Cable only if this installer put it there.
+; Uninstall: restore the user's default microphone, remove the user's
+;            startup entries, then offer to remove VB-Cable only if this
+;            installer put it there.
+;
+; The installer runs elevated, so its HKCU is the elevated account's. Under
+; Windows 11 Administrator Protection, or when another admin approves the UAC
+; prompt, that is not the signed-in user: per-user registry values go through
+; user-registry.ps1, which writes the signed-in user's hive.
 
 !define VT_REGKEY "Software\TunedUp"
 !define VT_RUNONCE "Software\Microsoft\Windows\CurrentVersion\RunOnce"
@@ -32,7 +38,11 @@
         DetailPrint "VB-Cable installed. A restart is required."
         SetRebootFlag true
         ; After the reboot, open straight into the setup wizard.
-        WriteRegStr HKCU "${VT_RUNONCE}" "TunedUpSetup" '"$INSTDIR\${MAINBINARYNAME}.exe" --first-run'
+        nsExec::ExecToLog '${VT_PS} "$INSTDIR\installer\user-registry.ps1" -Action SetRunOnce -Exe "$INSTDIR\${MAINBINARYNAME}.exe"'
+        Pop $1
+        ${If} $1 != 0
+          WriteRegStr HKCU "${VT_RUNONCE}" "TunedUpSetup" '"$INSTDIR\${MAINBINARYNAME}.exe" --first-run'
+        ${EndIf}
       ${ElseIf} $0 == 0
         DetailPrint "VB-Cable is already installed."
       ${Else}
@@ -51,6 +61,11 @@
   ${EndIf}
   ${If} $UpdateMode <> 1
     DeleteRegValue HKCU "${VT_RUNONCE}" "TunedUpSetup"
+    ; The template only clears the elevated account's autostart entry.
+    ${If} ${FileExists} "$INSTDIR\installer\user-registry.ps1"
+      nsExec::ExecToLog '${VT_PS} "$INSTDIR\installer\user-registry.ps1" -Action Cleanup'
+      Pop $0
+    ${EndIf}
     ; Resources are deleted before POSTUNINSTALL runs, so stage the VB-Cable
     ; helper (and any saved driver pack) in the auto-cleaned plugins dir.
     InitPluginsDir

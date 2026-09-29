@@ -8,7 +8,8 @@
 //! * [`setup`] — pure evaluation of the setup check (FR-12, FR-13): VB-Cable
 //!   presence, cable conflicts, Discord session, Bluetooth/sidetone warnings.
 //! * Windows-only: device change notifications, audio session enumeration,
-//!   and the real `IPolicyConfig` implementation.
+//!   the real `IPolicyConfig` implementation, and [`other_signed_in_user`]
+//!   (whose profile and registry hive an elevated process should use).
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
@@ -108,5 +109,60 @@ pub fn listen_to_device_enabled(endpoint_id: &str) -> Option<bool> {
     {
         let _ = endpoint_id;
         None
+    }
+}
+
+/// The person signed in to this Windows session, as seen from a process that
+/// runs elevated as a different account.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SignedInUser {
+    /// e.g. `S-1-5-21-...`
+    pub sid: String,
+    /// Their `%APPDATA%`
+    pub roaming_app_data: std::path::PathBuf,
+    /// Their `%LOCALAPPDATA%`
+    pub local_app_data: std::path::PathBuf,
+}
+
+/// The signed-in user when this process is elevated as another account, else
+/// `None` (not elevated, or plain UAC, which elevates the user themselves).
+///
+/// Windows 11's Administrator Protection runs elevated processes as a hidden
+/// admin account, and over-the-shoulder elevation as another admin: their
+/// `%APPDATA%`, `%LOCALAPPDATA%` and `HKCU` are not the user's, and WebView2
+/// drops elevation to the user, who can't write that account's profile.
+pub fn other_signed_in_user() -> Option<SignedInUser> {
+    #[cfg(windows)]
+    {
+        win::account::other_signed_in_user()
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
+}
+
+/// Whether this process runs with an elevated (administrator) token.
+pub fn is_elevated() -> bool {
+    #[cfg(windows)]
+    {
+        win::account::is_elevated()
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+/// A blocking error message box, for failures before any window exists
+/// (e.g. no WebView2 Runtime). Logs only on non-Windows.
+pub fn error_box(title: &str, text: &str) {
+    #[cfg(windows)]
+    {
+        win::account::error_box(title, text);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (title, text);
     }
 }
