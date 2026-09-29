@@ -168,17 +168,31 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Install PSScriptAnalyzer and Pester
+        shell: pwsh
+        run: |
+          # PSGallery lookups fail intermittently ("No match was found"); retry.
+          foreach ($m in @(@{ Name = 'PSScriptAnalyzer'; Min = '1.0' }, @{ Name = 'Pester'; Min = '5.5' })) {
+            for ($i = 1; $i -le 4; $i++) {
+              try {
+                Install-Module $m.Name -MinimumVersion $m.Min -Force -Scope CurrentUser -SkipPublisherCheck -ErrorAction Stop
+                break
+              } catch {
+                if ($i -eq 4) { throw }
+                Write-Output "Install-Module $($m.Name) failed (attempt $i): $_; retrying"
+                Start-Sleep -Seconds (5 * $i)
+              }
+            }
+          }
       - name: Lint
         shell: pwsh
         run: |
-          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
           $issues = foreach ($p in 'installer', 'scripts') { Invoke-ScriptAnalyzer -Path $p -Recurse -Severity Error, Warning -ExcludeRule PSAvoidUsingWriteHost }
           $issues | Format-Table -AutoSize
           if ($issues) { exit 1 }
       - name: Pester
         shell: pwsh
         run: |
-          Install-Module Pester -MinimumVersion 5.5 -Force -Scope CurrentUser -SkipPublisherCheck
           $cfg = New-PesterConfiguration
           $cfg.Run.Path = 'installer/tests'
           $cfg.Run.Exit = $true
@@ -212,10 +226,47 @@ jobs:
           path: target/release/bundle/nsis/*.exe
           retention-days: 14
 
+  app-window-e2e:
+    name: App window opens (${{ matrix.os }})
+    needs: package
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: scripts
+      - uses: actions/download-artifact@v8
+        with:
+          name: installer-${{ github.sha }}
+          path: bundle
+      - name: Install
+        run: |
+          $env:TUNEDUP_SKIP_VBCABLE = '1'
+          $installer = Get-ChildItem bundle -Filter '*-setup.exe' | Select-Object -First 1
+          $p = Start-Process -FilePath $installer.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "Installer exited with $($p.ExitCode)" }
+      - name: As the signed-in user
+        run: ./scripts/app-window-e2e.ps1 -Screenshot user.png
+      - name: Elevated as another admin account (as under Administrator Protection)
+        run: ./scripts/app-window-e2e.ps1 -AsOtherAdmin -Screenshot other-admin.png
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: app-window-${{ matrix.os }}
+          path: "*.png"
+          if-no-files-found: ignore
+
   ci-success:
     name: CI success
     if: always()
-    needs: [pr-title, frontend, rust-lint, rust-test, rust-portable, asio, bench-gate, soak, licenses, installer-scripts, package]
+    needs: [pr-title, frontend, rust-lint, rust-test, rust-portable, asio, bench-gate, soak, licenses, installer-scripts, package, app-window-e2e]
     runs-on: ubuntu-latest
     steps:
       - name: All required jobs passed

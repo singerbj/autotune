@@ -3,7 +3,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
+
+use criterion::{criterion_group, criterion_main, Criterion};
 use tuner_dsp::{signals, Scale, Tuner, TunerConfig, TuningParams, VoiceRange};
 
 fn bench(c: &mut Criterion) {

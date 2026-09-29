@@ -236,6 +236,8 @@ One signed NSIS installer from the Tauri bundler, with install hooks that set up
 
 **Uninstall:** restore any changed default devices, remove the app, and offer to remove VB-Cable (`-u -h`) only if the app installed it.
 
+**Elevated as another account:** under Windows 11 Administrator Protection, or when another admin approves the UAC prompt, elevated code runs as a different account. Per-user state (the `RunOnce` entry, autostart, config, logs, the WebView2 profile) then goes to the signed-in user, not the elevated account. See [ADR 0009](decisions/0009-elevated-as-another-account.md).
+
 **Signing and updates**
 
 - Code-sign the app and installer to avoid SmartScreen warnings.

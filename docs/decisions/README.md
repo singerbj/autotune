@@ -14,3 +14,4 @@ docs/decisions/ instead of silently diverging").
 | [0006](0006-psola-grain-selection-and-latency.md) | PSOLA grain selection and the one-period latency | Accepted |
 | [0007](0007-product-name-and-identifier.md) | Product name and identifier | Accepted |
 | [0008](0008-vb-cable-buffer-size.md) | VB-Cable internal buffer size is left to the user | Accepted |
+| [0009](0009-elevated-as-another-account.md) | Elevated as another account (Administrator Protection) | Accepted |
