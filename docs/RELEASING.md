@@ -18,6 +18,13 @@ installed apps.
 
 ## One-time setup
 
+**Shortcut:** with the GitHub CLI logged in, run
+`scripts/setup-release-secrets.sh` on your own machine. It generates the key
+pair locally and sets the variable and both secrets below. Then back up
+`~/.tauri/voice-tuner.key`.
+
+Manual steps:
+
 1. Generate the updater signing key (keep the private key safe — losing it
    means installed apps can never update again):
 
@@ -39,6 +46,11 @@ installed apps.
    Without the certificate the installer is unsigned and SmartScreen warns.
 
 3. Protect `main` and require the **CI success** check.
+
+## Before a release
+
+Run through [`HARDWARE_TEST.md`](HARDWARE_TEST.md) on a real PC with a
+USB headset and Discord.
 
 ## Cutting a release
 
