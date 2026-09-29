@@ -1,4 +1,4 @@
-; Voice Tuner NSIS installer hooks (FR-15, FR-14, NFR-08, NFR-09).
+; TunedUp NSIS installer hooks (FR-15, FR-14, NFR-08, NFR-09).
 ;
 ; Hooked into Tauri's NSIS template via bundle.windows.nsis.installerHooks.
 ; Variables used from the template: $INSTDIR, $UpdateMode (1 when the
@@ -10,7 +10,7 @@
 ; Uninstall: restore the user's default microphone, then offer to remove
 ;            VB-Cable only if this installer put it there.
 
-!define VT_REGKEY "Software\VoiceTuner"
+!define VT_REGKEY "Software\TunedUp"
 !define VT_RUNONCE "Software\Microsoft\Windows\CurrentVersion\RunOnce"
 ; NSIS is 32-bit: use the 64-bit PowerShell (sysnative) so the driver setup,
 ; PnP queries and HKLM writes all see the native 64-bit system.
@@ -21,9 +21,9 @@
 
 !macro NSIS_HOOK_POSTINSTALL
   ${If} $UpdateMode <> 1
-    ReadEnvStr $R9 "VOICE_TUNER_SKIP_VBCABLE"
+    ReadEnvStr $R9 "TUNEDUP_SKIP_VBCABLE"
     ${If} $R9 == "1"
-      DetailPrint "Skipping VB-Cable (VOICE_TUNER_SKIP_VBCABLE=1)."
+      DetailPrint "Skipping VB-Cable (TUNEDUP_SKIP_VBCABLE=1)."
     ${Else}
       DetailPrint "Checking for the VB-Cable virtual audio driver..."
       nsExec::ExecToLog '${VT_PS} "$INSTDIR\installer\install-vbcable.ps1" -Action Install -PackDir "$INSTDIR\installer\vbcable" -RegistryKey "HKLM:\${VT_REGKEY}"'
@@ -32,7 +32,7 @@
         DetailPrint "VB-Cable installed. A restart is required."
         SetRebootFlag true
         ; After the reboot, open straight into the setup wizard.
-        WriteRegStr HKCU "${VT_RUNONCE}" "VoiceTunerSetup" '"$INSTDIR\${MAINBINARYNAME}.exe" --first-run'
+        WriteRegStr HKCU "${VT_RUNONCE}" "TunedUpSetup" '"$INSTDIR\${MAINBINARYNAME}.exe" --first-run'
       ${ElseIf} $0 == 0
         DetailPrint "VB-Cable is already installed."
       ${Else}
@@ -50,7 +50,7 @@
     Pop $0
   ${EndIf}
   ${If} $UpdateMode <> 1
-    DeleteRegValue HKCU "${VT_RUNONCE}" "VoiceTunerSetup"
+    DeleteRegValue HKCU "${VT_RUNONCE}" "TunedUpSetup"
     ; Resources are deleted before POSTUNINSTALL runs, so stage the VB-Cable
     ; helper (and any saved driver pack) in the auto-cleaned plugins dir.
     InitPluginsDir
@@ -68,7 +68,7 @@
       StrCpy $R1 "no"
       ${If} $PassiveMode <> 1
       ${AndIfNot} ${Silent}
-        MessageBox MB_YESNO|MB_ICONQUESTION "Voice Tuner installed the VB-Cable virtual audio driver.$\r$\n$\r$\nRemove VB-Cable as well? Choose No if other apps use it." /SD IDNO IDNO vt_keep_cable
+        MessageBox MB_YESNO|MB_ICONQUESTION "TunedUp installed the VB-Cable virtual audio driver.$\r$\n$\r$\nRemove VB-Cable as well? Choose No if other apps use it." /SD IDNO IDNO vt_keep_cable
         StrCpy $R1 "yes"
         vt_keep_cable:
       ${EndIf}

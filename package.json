@@ -1,5 +1,5 @@
 {
-  "name": "voice-tuner-workspace",
+  "name": "tunedup-workspace",
   "private": true,
   "packageManager": "npm@10.9.7",
   "workspaces": [
@@ -9,7 +9,7 @@
     "tauri": "tauri",
     "dev": "tauri dev",
     "build": "tauri build",
-    "bindings": "cargo test -p voice-tuner --lib tests::export_bindings",
+    "bindings": "cargo test -p tunedup --lib tests::export_bindings",
     "lint": "npm run lint -w ui",
     "format": "npm run format -w ui && cargo fmt --all",
     "check": "npm run check -w ui && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings",

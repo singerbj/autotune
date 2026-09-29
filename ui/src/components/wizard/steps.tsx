@@ -37,7 +37,7 @@ export function WelcomeStep() {
   return (
     <div className="flex flex-col gap-3 text-sm leading-relaxed">
       <p>
-        Voice Tuner corrects the pitch of your voice in real time. You'll hear yourself in your
+        TunedUp corrects the pitch of your voice in real time. You'll hear yourself in your
         headphones, and apps like Discord hear the tuned voice through a virtual microphone
         (VB-Cable).
       </p>
@@ -90,9 +90,9 @@ export function CableStep() {
           <div className="flex flex-col gap-1">
             <span className="font-medium">VB-Cable was not found.</span>
             <span>
-              The Voice Tuner installer normally installs it for you. Re-run the installer (or
-              install VB-Cable from vb-audio.com); Windows may need a reboot before the cable
-              appears. You can still use monitoring without it.
+              The TunedUp installer normally installs it for you. Re-run the installer (or install
+              VB-Cable from vb-audio.com); Windows may need a reboot before the cable appears. You
+              can still use monitoring without it.
             </span>
           </div>
         </Alert>

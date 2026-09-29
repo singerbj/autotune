@@ -1,4 +1,4 @@
-//! Voice Tuner desktop app (Tauri 2). Rust owns all state; the React UI is a
+//! TunedUp desktop app (Tauri 2). Rust owns all state; the React UI is a
 //! typed view over the commands and events declared here.
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
@@ -26,7 +26,7 @@ use crate::events::{DevicesChangedEvent, MetersEvent};
 use crate::state::{lock, state, AppState};
 
 /// Tauri identifier; also the `%APPDATA%` folder name.
-pub const IDENTIFIER: &str = "io.github.singerbj.voicetuner";
+pub const IDENTIFIER: &str = "io.github.singerbj.tunedup";
 const METER_PERIOD: Duration = Duration::from_millis(33);
 
 /// The tauri-specta builder: single source of truth for commands and events.
@@ -112,7 +112,7 @@ fn init_logging(dir: &std::path::Path) -> Option<tracing_appender::non_blocking:
     let _ = std::fs::create_dir_all(dir);
     let appender = tracing_appender::rolling::Builder::new()
         .rotation(tracing_appender::rolling::Rotation::DAILY)
-        .filename_prefix("voice-tuner")
+        .filename_prefix("tunedup")
         .filename_suffix("log")
         .max_log_files(7)
         .build(dir)

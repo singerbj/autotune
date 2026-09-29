@@ -19,18 +19,18 @@ had to be installed, one reboot after which the app opens in the setup wizard.
    - verifies the setup program is signed by VB-Audio;
    - adds VB-Audio's publisher certificate to `LocalMachine\TrustedPublisher`;
    - runs `VBCABLE_Setup_x64.exe -i -h`;
-   - writes `HKLM\Software\VoiceTuner\InstalledVBCable = 1` and exits `3010`.
+   - writes `HKLM\Software\TunedUp\InstalledVBCable = 1` and exits `3010`.
 3. On `3010` the installer sets the reboot flag (the finish page offers
    "Reboot now") and adds a `RunOnce` entry that starts
-   `voice-tuner.exe --first-run` after the reboot.
+   `tunedup.exe --first-run` after the reboot.
 4. Updates (`/UPDATE`, run by the auto-updater) skip all of the above.
 
-Set the environment variable `VOICE_TUNER_SKIP_VBCABLE=1` to skip step 2
+Set the environment variable `TUNEDUP_SKIP_VBCABLE=1` to skip step 2
 (used by the CI install smoke test).
 
 ## Uninstall sequence
 
-1. `voice-tuner.exe --restore-defaults` restores any default recording
+1. `tunedup.exe --restore-defaults` restores any default recording
    devices changed by "Use for all apps" (NFR-08).
 2. Tauri removes the app, shortcuts, the autostart entry and (optionally) app data.
 3. If `InstalledVBCable = 1`, the user is asked whether to remove VB-Cable
@@ -39,8 +39,8 @@ Set the environment variable `VOICE_TUNER_SKIP_VBCABLE=1` to skip step 2
 Silent install/uninstall:
 
 ```powershell
-.\Voice.Tuner_x.y.z_x64-setup.exe /S
-& "C:\Program Files\Voice Tuner\uninstall.exe" /S
+.\TunedUp_x.y.z_x64-setup.exe /S
+& "C:\Program Files\TunedUp\uninstall.exe" /S
 ```
 
 ## Bundling VB-Cable

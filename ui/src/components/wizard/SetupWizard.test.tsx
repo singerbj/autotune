@@ -16,7 +16,7 @@ describe("SetupWizard (FR-12, FR-13)", () => {
     const onOpenChange = vi.fn<(open: boolean) => void>();
     const { user } = renderWithClient(<SetupWizard open onOpenChange={onOpenChange} />);
 
-    expect(heading()).toHaveTextContent("Welcome to Voice Tuner");
+    expect(heading()).toHaveTextContent("Welcome to TunedUp");
     expect(screen.getByRole("button", { name: "Back" })).toBeDisabled();
 
     await user.click(screen.getByRole("button", { name: "Next" }));
@@ -24,7 +24,7 @@ describe("SetupWizard (FR-12, FR-13)", () => {
     expect(await screen.findByRole("combobox", { name: "Microphone" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(heading()).toHaveTextContent("Welcome to Voice Tuner");
+    expect(heading()).toHaveTextContent("Welcome to TunedUp");
 
     await user.click(screen.getByRole("button", { name: "Next" }));
     await user.click(screen.getByRole("button", { name: "Next" }));

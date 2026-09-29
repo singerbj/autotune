@@ -624,7 +624,7 @@ export function createMockBackend(): MockBackend {
       const engine = engineStatus();
       const meters = state.supervisor.state === "running" ? meterSnapshot() : null;
       const lines = [
-        `Voice Tuner ${APP_VERSION} (browser mock)`,
+        `TunedUp ${APP_VERSION} (browser mock)`,
         `OS: ${typeof navigator === "undefined" ? "unknown" : navigator.userAgent}`,
         `Supervisor: ${state.supervisor.state} (restarts ${state.supervisor.restarts})`,
         engine
@@ -642,8 +642,8 @@ export function createMockBackend(): MockBackend {
         engine,
         meters,
         measuredLatencyMs: state.config.measuredLatencyMs,
-        logDir: "C:\\Users\\you\\AppData\\Local\\VoiceTuner\\logs",
-        configPath: "C:\\Users\\you\\AppData\\Roaming\\VoiceTuner\\config.json",
+        logDir: "C:\\Users\\you\\AppData\\Local\\TunedUp\\logs",
+        configPath: "C:\\Users\\you\\AppData\\Roaming\\TunedUp\\config.json",
         report: lines.join("\n"),
       };
       return Promise.resolve(diagnostics);

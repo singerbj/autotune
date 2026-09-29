@@ -170,7 +170,7 @@ mod tests {
     fn fr12_cable_conflicts_exclude_self_and_expired() {
         let eps = endpoints();
         let cin = [
-            sess(42, "voice-tuner.exe", SessionState::Active),
+            sess(42, "tunedup.exe", SessionState::Active),
             sess(7, "obs64.exe", SessionState::Active),
             sess(8, "obs64.exe", SessionState::Inactive),
             sess(9, "spotify.exe", SessionState::Expired),

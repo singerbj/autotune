@@ -1,4 +1,4 @@
-Voice Tuner installer helpers.
+TunedUp installer helpers.
 
 install-vbcable.ps1  Installs/removes the VB-Audio Virtual Cable driver.
 vbcable\             VB-Cable driver pack, present only in builds licensed

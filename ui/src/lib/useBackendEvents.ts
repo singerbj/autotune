@@ -32,7 +32,7 @@ export function useBackendEvents(): void {
     keep(events.bypassEvent.listen((e) => setBypassCache(qc, e.payload)));
     keep(events.updateEvent.listen((e) => qc.setQueryData(queryKeys.updateStatus, e.payload)));
     keep(events.devicesChangedEvent.listen((e) => qc.setQueryData(queryKeys.devices, e.payload)));
-    keep(events.errorEvent.listen((e) => toastError("Voice Tuner", e.payload)));
+    keep(events.errorEvent.listen((e) => toastError("TunedUp", e.payload)));
 
     return () => {
       disposed = true;

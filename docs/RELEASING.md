@@ -21,7 +21,7 @@ installed apps.
 **Shortcut:** with the GitHub CLI logged in, run
 `scripts/setup-release-secrets.sh` on your own machine. It generates the key
 pair locally and sets the variable and both secrets below. Then back up
-`~/.tauri/voice-tuner.key`.
+`~/.tauri/tunedup.key`.
 
 Manual steps:
 
@@ -29,15 +29,15 @@ Manual steps:
    means installed apps can never update again):
 
    ```sh
-   npx tauri signer generate -w ~/.tauri/voice-tuner.key
+   npx tauri signer generate -w ~/.tauri/tunedup.key
    ```
 
 2. In the GitHub repository settings:
 
    | Kind | Name | Value |
    | --- | --- | --- |
-   | Variable | `TAURI_UPDATER_PUBKEY` | contents of `voice-tuner.key.pub` |
-   | Secret | `TAURI_SIGNING_PRIVATE_KEY` | contents of `voice-tuner.key` |
+   | Variable | `TAURI_UPDATER_PUBKEY` | contents of `tunedup.key.pub` |
+   | Secret | `TAURI_SIGNING_PRIVATE_KEY` | contents of `tunedup.key` |
    | Secret | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | the key password (if any) |
    | Secret *(optional)* | `WINDOWS_CERTIFICATE` | base64 of the Authenticode `.pfx` |
    | Secret *(optional)* | `WINDOWS_CERTIFICATE_PASSWORD` | `.pfx` password |

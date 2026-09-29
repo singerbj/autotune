@@ -51,7 +51,7 @@ Headset: ______________________ (wired USB, ~3 ms periods)
       *CABLE Output* as the default recording device (both default and
       communications).
 - [ ] Quit from the tray: the previous defaults are back.
-- [ ] Turn it on again, then kill `voice-tuner.exe` in Task Manager; relaunch:
+- [ ] Turn it on again, then kill `tunedup.exe` in Task Manager; relaunch:
       previous defaults are restored.
 
 ## 6. Device changes (FR-05)

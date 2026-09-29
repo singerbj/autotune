@@ -8,5 +8,5 @@
 static ALLOC: assert_no_alloc::AllocDisabler = assert_no_alloc::AllocDisabler;
 
 fn main() {
-    std::process::exit(voice_tuner_lib::run());
+    std::process::exit(tunedup_lib::run());
 }

@@ -56,7 +56,7 @@ export function Header() {
     <header className="flex min-h-16 shrink-0 items-center gap-4 border-b bg-card/60 px-5 py-2">
       <div className="flex items-center gap-2">
         <img src="/icon.svg" alt="" className="size-7" />
-        <h1 className="text-base font-semibold tracking-tight">Voice Tuner</h1>
+        <h1 className="text-base font-semibold tracking-tight">TunedUp</h1>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2" aria-label="Engine status">

@@ -25,7 +25,7 @@ pub fn show_main(app: &AppHandle) {
 
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let bypass_on = state(app).controls.bypass();
-    let show = MenuItem::with_id(app, "show", "Open Voice Tuner", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Open TunedUp", true, None::<&str>)?;
     let bypass = CheckMenuItem::with_id(
         app,
         "bypass",
@@ -50,7 +50,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         ],
     )?;
     let mut builder = TrayIconBuilder::with_id("main")
-        .tooltip("Voice Tuner")
+        .tooltip("TunedUp")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, e| match e.id().as_ref() {
@@ -117,9 +117,9 @@ pub fn sync(app: &AppHandle, bypass: bool) {
     }
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(if bypass {
-            "Voice Tuner — bypassed"
+            "TunedUp — bypassed"
         } else {
-            "Voice Tuner"
+            "TunedUp"
         }));
     }
 }

@@ -24,7 +24,7 @@ pub struct Diagnostics {
 
 pub fn report(d: &Diagnostics) -> String {
     let mut s = String::new();
-    let _ = writeln!(s, "Voice Tuner {} on {}", d.app_version, d.os);
+    let _ = writeln!(s, "TunedUp {} on {}", d.app_version, d.os);
     let _ = writeln!(s, "Backend: {}", d.audio_backend);
     let _ = writeln!(
         s,
@@ -121,7 +121,7 @@ mod tests {
             report: String::new(),
         };
         let r = report(&d);
-        assert!(r.contains("Voice Tuner 1.2.3"));
+        assert!(r.contains("TunedUp 1.2.3"));
         assert!(r.contains("Xruns: 3"));
         assert!(r.contains("p99 40 µs, max 120 µs"));
         assert!(r.contains("Measured round trip: 17.5 ms"));

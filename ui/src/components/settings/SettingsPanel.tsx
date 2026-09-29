@@ -141,7 +141,7 @@ export function SettingsPanel({ onOpenWizard }: { onOpenWizard: () => void }) {
         <SettingRow
           htmlFor="launch-at-login"
           label="Launch at login"
-          description="Start Voice Tuner in the tray when you sign in to Windows."
+          description="Start TunedUp in the tray when you sign in to Windows."
         >
           <Switch
             id="launch-at-login"
@@ -183,7 +183,7 @@ export function SettingsPanel({ onOpenWizard }: { onOpenWizard: () => void }) {
         <CardHeader>
           <CardTitle>About</CardTitle>
           <CardDescription>
-            Voice Tuner {appInfo.data?.version ?? "…"}
+            TunedUp {appInfo.data?.version ?? "…"}
             {appInfo.data && ` · ${appInfo.data.platform}`}
           </CardDescription>
         </CardHeader>

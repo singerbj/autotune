@@ -14,7 +14,7 @@ set -euo pipefail
 
 repo="${1:-singerbj/autotune}"
 key_dir="${HOME}/.tauri"
-key="${key_dir}/voice-tuner.key"
+key="${key_dir}/tunedup.key"
 
 command -v gh >/dev/null || { echo "Install the GitHub CLI: https://cli.github.com" >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "Run 'gh auth login' first." >&2; exit 1; }

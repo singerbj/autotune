@@ -2,7 +2,7 @@
 BeforeAll {
     $script = Join-Path $PSScriptRoot '..\resources\install-vbcable.ps1'
     # Dot-source to load the functions without running the entry point.
-    . $script -Action Detect -RegistryKey 'HKCU:\Software\VoiceTunerTest' -PackDir (Join-Path $TestDrive 'pack')
+    . $script -Action Detect -RegistryKey 'HKCU:\Software\TunedUpTest' -PackDir (Join-Path $TestDrive 'pack')
 }
 
 Describe 'Test-VBCableInstalled' {
@@ -53,7 +53,7 @@ Describe 'Invoke-Uninstall' {
         Invoke-Uninstall | Should -Be 0
         Should -Invoke Invoke-Setup -Times 0
     }
-    It 'removes VB-Cable when Voice Tuner installed it' {
+    It 'removes VB-Cable when TunedUp installed it' {
         Mock Test-Marker { $true }
         Mock Test-Path { $true }
         Mock Invoke-Setup { 0 }

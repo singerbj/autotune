@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Installs or removes the VB-Audio Virtual Cable driver for Voice Tuner (FR-15).
+  Installs or removes the VB-Audio Virtual Cable driver for TunedUp (FR-15).
 
 .DESCRIPTION
   Called by the NSIS installer hooks (installer/nsis/hooks.nsh), elevated.
@@ -32,7 +32,7 @@ param(
     [ValidateSet('Install', 'Uninstall', 'Detect')]
     [string] $Action = 'Install',
     [string] $PackDir = (Join-Path $PSScriptRoot 'vbcable'),
-    [string] $RegistryKey = 'HKLM:\Software\VoiceTuner',
+    [string] $RegistryKey = 'HKLM:\Software\TunedUp',
     [string] $DownloadUrl = 'https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip',
     [switch] $DryRun
 )
@@ -40,7 +40,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $SetupName = 'VBCABLE_Setup_x64.exe'
-$LogFile = Join-Path $env:TEMP 'voice-tuner-vbcable.log'
+$LogFile = Join-Path $env:TEMP 'tunedup-vbcable.log'
 
 function Write-VtLog([string] $Message) {
     $line = '{0:u} {1}' -f (Get-Date), $Message
@@ -144,7 +144,7 @@ function Invoke-Install {
 }
 
 function Invoke-Uninstall {
-    if (-not (Test-Marker)) { Write-VtLog 'VB-Cable was not installed by Voice Tuner; leaving it.'; return 0 }
+    if (-not (Test-Marker)) { Write-VtLog 'VB-Cable was not installed by TunedUp; leaving it.'; return 0 }
     $setup = Join-Path $PackDir $SetupName
     if (-not (Test-Path $setup)) { $setup = Get-DriverPack }
     $code = Invoke-Setup $setup @('-u', '-h')

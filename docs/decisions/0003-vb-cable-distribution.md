@@ -16,7 +16,7 @@ VB-Audio that has not been secured yet (ARCHITECTURE › Licenses).
   the setup program's Authenticode signature before running it.
 - Builds licensed to bundle set the repository variable `BUNDLE_VBCABLE=true`;
   the release workflow then places the pack in the installer.
-- The installer records `HKLM\Software\VoiceTuner\InstalledVBCable=1` and the
+- The installer records `HKLM\Software\TunedUp\InstalledVBCable=1` and the
   uninstaller offers to remove VB-Cable only when that flag is set.
 
 ## Consequences

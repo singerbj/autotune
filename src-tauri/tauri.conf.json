@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Voice Tuner",
-  "mainBinaryName": "voice-tuner",
-  "identifier": "io.github.singerbj.voicetuner",
+  "productName": "TunedUp",
+  "mainBinaryName": "tunedup",
+  "identifier": "io.github.singerbj.tunedup",
   "build": {
     "beforeDevCommand": "npm run dev -w ui",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Voice Tuner",
+        "title": "TunedUp",
         "width": 1120,
         "height": 780,
         "minWidth": 920,
@@ -61,7 +61,7 @@
         "installerHooks": "../installer/nsis/hooks.nsh",
         "installerIcon": "icons/icon.ico",
         "displayLanguageSelector": false,
-        "startMenuFolder": "Voice Tuner"
+        "startMenuFolder": "TunedUp"
       }
     }
   },

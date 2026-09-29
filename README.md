@@ -1,4 +1,4 @@
-# Voice Tuner
+# TunedUp
 
 A Windows desktop app, built in Rust with Tauri 2, that pitch-corrects your
 microphone in real time. You hear the tuned voice in your headphones at
@@ -28,7 +28,7 @@ requirements in [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md), deviations in
 
 ## Install
 
-1. Download `Voice Tuner_<version>_x64-setup.exe` from the
+1. Download `TunedUp_<version>_x64-setup.exe` from the
    [latest release](https://github.com/singerbj/autotune/releases/latest).
 2. Run it and accept the single UAC prompt. If VB-Cable is not installed yet
    the installer installs it silently and asks for one reboot; after the
@@ -37,8 +37,8 @@ requirements in [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md), deviations in
    *CABLE Output (VB-Audio Virtual Cable)* and turn off Noise Suppression,
    Echo Cancellation and Automatic Gain Control.
 
-Silent install for managed machines: `Voice.Tuner_<version>_x64-setup.exe /S`
-(set `VOICE_TUNER_SKIP_VBCABLE=1` to skip the driver).
+Silent install for managed machines: `TunedUp_<version>_x64-setup.exe /S`
+(set `TUNEDUP_SKIP_VBCABLE=1` to skip the driver).
 
 Requirements: Windows 10 22H2 or Windows 11, x64. WebView2 is installed
 automatically if missing.
@@ -53,15 +53,15 @@ your settings are kept. Turn automatic checks off in *Settings*. Details:
 
 ## Uninstall
 
-*Settings → Apps → Voice Tuner → Uninstall* (or run `uninstall.exe`). The
+*Settings → Apps → TunedUp → Uninstall* (or run `uninstall.exe`). The
 uninstaller:
 
 1. restores your previous default microphone if "Use for all apps" changed it;
 2. removes the app, shortcuts and the launch-at-login entry, and optionally
-   your settings (`%APPDATA%\io.github.singerbj.voicetuner`) and logs;
-3. offers to remove VB-Cable — only if Voice Tuner installed it.
+   your settings (`%APPDATA%\io.github.singerbj.tunedup`) and logs;
+3. offers to remove VB-Cable — only if TunedUp installed it.
 
-Silent: `"C:\Program Files\Voice Tuner\uninstall.exe" /S` (keeps VB-Cable).
+Silent: `"C:\Program Files\TunedUp\uninstall.exe" /S` (keeps VB-Cable).
 
 ## Repository layout
 

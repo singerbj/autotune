@@ -1,9 +1,13 @@
-# 0007 — Working product name and identifier
+# 0007 — Product name and identifier
 
-**Status:** Proposed (open question in ARCHITECTURE.md)
+**Status:** Accepted
 
-Until the product name is decided the app ships as **Voice Tuner**,
-identifier `io.github.singerbj.voicetuner`, binary `voice-tuner.exe`.
-The identifier names the `%APPDATA%` folder and must not change after the
-first public release (it would orphan settings and the updater).
-"Auto-Tune" is a trademark of Antares and is avoided.
+The product is **TunedUp** (open question in ARCHITECTURE.md, decided by the
+owner). Identifier `io.github.singerbj.tunedup`, binary `tunedup.exe`,
+install folder `C:\Program Files\TunedUp`, registry key
+`HKLM\Software\TunedUp`.
+
+The identifier names the `%APPDATA%` folder and the updater's install
+identity, so it must not change after the first public release (it would
+orphan settings and break updates). "Auto-Tune" is a trademark of Antares
+and is avoided. A formal trademark search has not been done.

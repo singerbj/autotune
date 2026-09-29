@@ -22,7 +22,7 @@ export const WIZARD_STEPS: ReadonlyArray<{
   heading: string;
   Component: ComponentType;
 }> = [
-  { id: "welcome", title: "Welcome", heading: "Welcome to Voice Tuner", Component: WelcomeStep },
+  { id: "welcome", title: "Welcome", heading: "Welcome to TunedUp", Component: WelcomeStep },
   { id: "devices", title: "Devices", heading: "Choose your devices", Component: DevicesStep },
   {
     id: "cable",
@@ -67,7 +67,7 @@ export function SetupWizard({
         overlayClassName="bg-background"
       >
         <div className="flex items-center justify-between border-b px-8 py-4 pr-14">
-          <span className="text-base font-semibold">Voice Tuner setup</span>
+          <span className="text-base font-semibold">TunedUp setup</span>
           <ol className="flex items-center gap-1" aria-label="Setup steps">
             {WIZARD_STEPS.map((s, i) => (
               <li
