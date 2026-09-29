@@ -33,7 +33,7 @@ rubato = { version = "0.16", default-features = false }
 realfft = "3"
 assert_no_alloc = "1.1"
 hound = "3.5"
-criterion = "0.5"
+criterion = "0.8"
 tracing = "0.1"
 tempfile = "3"
 clap = { version = "4", features = ["derive"] }
