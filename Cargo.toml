@@ -14,7 +14,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.85"
 license = "UNLICENSED"
-repository = "https://github.com/singerbj/autotune"
+repository = "https://github.com/singerbj/tunedup"
 authors = ["Ben Singer"]
 
 [workspace.dependencies]

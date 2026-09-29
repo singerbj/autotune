@@ -3,7 +3,7 @@
 Installed apps update themselves from GitHub Releases (FR-22):
 
 1. On launch (+20 s) and every 6 h the app fetches
-   `https://github.com/singerbj/autotune/releases/latest/download/latest.json`.
+   `https://github.com/singerbj/tunedup/releases/latest/download/latest.json`.
 2. If a newer version is listed it downloads the NSIS installer in the
    background and verifies its **minisign signature** against the public key
    compiled into the app.

@@ -12,7 +12,7 @@
 # Usage: scripts/setup-release-secrets.sh [owner/repo]
 set -euo pipefail
 
-repo="${1:-singerbj/autotune}"
+repo="${1:-singerbj/tunedup}"
 key_dir="${HOME}/.tauri"
 key="${key_dir}/tunedup.key"
 

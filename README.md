@@ -29,7 +29,7 @@ requirements in [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md), deviations in
 ## Install
 
 1. Download `TunedUp_<version>_x64-setup.exe` from the
-   [latest release](https://github.com/singerbj/autotune/releases/latest).
+   [latest release](https://github.com/singerbj/tunedup/releases/latest).
 2. Run it and accept the single UAC prompt. If VB-Cable is not installed yet
    the installer installs it silently and asks for one reboot; after the
    reboot the app opens in the setup wizard.
