@@ -66,6 +66,8 @@ pub struct SetupReport {
     pub bluetooth_warning: bool,
     /// "Listen to this device" is on for the selected mic (doubled voice).
     pub sidetone_warning: bool,
+    /// Running over Remote Desktop, where the PC's audio devices are hidden.
+    pub remote_session: bool,
 }
 
 /// True for Discord's stable, PTB, Canary and development builds.
@@ -84,6 +86,7 @@ pub struct SetupInputs<'a> {
     pub cable_output_sessions: &'a [AudioSession],
     pub own_pid: u32,
     pub listen_enabled: Option<bool>,
+    pub remote_session: bool,
 }
 
 pub fn evaluate_setup(i: &SetupInputs<'_>) -> SetupReport {
@@ -131,6 +134,7 @@ pub fn evaluate_setup(i: &SetupInputs<'_>) -> SetupReport {
         discord_active: discord.iter().any(|s| s.state == SessionState::Active),
         bluetooth_warning: is_bt(i.selected_mic) || is_bt(i.selected_headphones),
         sidetone_warning: i.listen_enabled == Some(true),
+        remote_session: i.remote_session,
     }
 }
 
@@ -180,6 +184,7 @@ mod tests {
             cable_output_sessions: cout,
             own_pid: 42,
             listen_enabled: Some(false),
+            remote_session: false,
         }
     }
 

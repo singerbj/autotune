@@ -272,6 +272,7 @@ pub fn run_setup_check(app: AppHandle) -> AppResult<SetupReport> {
         cable_output_sessions: &cout,
         own_pid: std::process::id(),
         listen_enabled: mic.as_deref().and_then(tuner_win::listen_to_device_enabled),
+        remote_session: tuner_win::is_remote_session(),
     }))
 }
 

@@ -154,6 +154,20 @@ pub fn is_elevated() -> bool {
     }
 }
 
+/// Whether this process runs in a Remote Desktop session. Windows then shows
+/// only the redirected "Remote Audio" devices, hiding VB-Cable and the PC's
+/// own mic and headphones.
+pub fn is_remote_session() -> bool {
+    #[cfg(windows)]
+    {
+        win::account::is_remote_session()
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
 /// A blocking error message box, for failures before any window exists
 /// (e.g. no WebView2 Runtime). Logs only on non-Windows.
 pub fn error_box(title: &str, text: &str) {

@@ -89,7 +89,17 @@ export function CableStep() {
         <Alert variant="warning">
           <CircleXIcon aria-hidden />
           <div className="flex flex-col gap-2">
-            {report.inactiveCables.length > 0 ? (
+            {report.remoteSession ? (
+              <>
+                <span className="font-medium">You're connected over Remote Desktop.</span>
+                <span>
+                  Windows hides this PC's own audio devices in a Remote Desktop session, including
+                  VB-Cable, so TunedUp can't see them. Run TunedUp at the PC itself, or in Remote
+                  Desktop Connection choose Show Options → Local Resources → Remote audio → Settings
+                  → <strong>Play on remote computer</strong> and reconnect.
+                </span>
+              </>
+            ) : report.inactiveCables.length > 0 ? (
               <>
                 <span className="font-medium">VB-Cable is installed, but Windows has it off.</span>
                 <ul className="list-disc pl-5">

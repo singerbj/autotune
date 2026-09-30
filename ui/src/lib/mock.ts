@@ -411,6 +411,7 @@ export function createMockBackend(): MockBackend {
       bluetoothWarning:
         (selectedMic()?.isBluetooth ?? false) || (selectedHeadphones()?.isBluetooth ?? false),
       sidetoneWarning: false,
+      remoteSession: false,
     };
   };
 
