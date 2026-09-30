@@ -5,37 +5,49 @@ import { commands, events } from "@/lib/api";
 import { useBackendEvents } from "@/lib/useBackendEvents";
 import { renderWithClient } from "@/test/render";
 
-import { BypassToggle } from "./BypassToggle";
+import { TuningToggle } from "./TuningToggle";
 
 function WithEvents() {
   useBackendEvents();
-  return <BypassToggle />;
+  return <TuningToggle />;
 }
 
-describe("BypassToggle (FR-10)", () => {
-  it("calls setBypass with the toggled value", async () => {
+describe("TuningToggle (FR-10)", () => {
+  it("starts off and toggles bypass", async () => {
     const spy = vi.spyOn(commands, "setBypass");
-    const { user } = renderWithClient(<BypassToggle />);
-    const button = await screen.findByRole("button", { name: "Bypass" });
+    const { user } = renderWithClient(<TuningToggle />);
+    const button = await screen.findByRole("button", { name: "Tuning" });
     await waitFor(() => expect(button).toBeEnabled());
     expect(button).toHaveAttribute("aria-pressed", "false");
 
     await user.click(button);
-    expect(spy).toHaveBeenCalledWith(true);
+    expect(spy).toHaveBeenCalledWith(false);
     await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
 
     await user.click(button);
-    expect(spy).toHaveBeenLastCalledWith(false);
+    expect(spy).toHaveBeenLastCalledWith(true);
     await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "false"));
+  });
+
+  it("names the hotkey", async () => {
+    renderWithClient(<TuningToggle />);
+    const button = await screen.findByRole("button", { name: "Tuning" });
+    await waitFor(() =>
+      expect(button).toHaveAttribute("title", expect.stringContaining("Ctrl+Alt+B")),
+    );
   });
 
   it("follows bypassEvent from the tray / hotkey", async () => {
     renderWithClient(<WithEvents />);
-    const button = await screen.findByRole("button", { name: "Bypass" });
+    const button = await screen.findByRole("button", { name: "Tuning" });
     await waitFor(() => expect(button).toBeEnabled());
+    await act(async () => {
+      await events.bypassEvent.emit(false);
+    });
+    await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
     await act(async () => {
       await events.bypassEvent.emit(true);
     });
-    await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "true"));
+    await waitFor(() => expect(button).toHaveAttribute("aria-pressed", "false"));
   });
 });

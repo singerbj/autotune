@@ -14,7 +14,11 @@ export const commands = {
 	/**  Capture and render endpoints with ASIO and VB-Cable flagged (FR-01). */
 	listDevices: () => typedError<DeviceInfo[], AppError>(__TAURI_INVOKE("list_devices")),
 	getConfig: () => __TAURI_INVOKE<AppConfig>("get_config").then((v) => (({...v,measuredLatencyMs:v.measuredLatencyMs==null?v.measuredLatencyMs:v.measuredLatencyMs}) as typeof v)),
-	/**  Patch persisted settings (FR-20); rebuilds the engine when devices change. */
+	/**
+	 *  Patch persisted settings (FR-20); rebuilds the engine when devices change.
+	 *  A new hotkey takes effect right away; if it's invalid or taken, nothing
+	 *  is saved and the old one keeps working.
+	 */
 	setConfig: (patch: ConfigPatch) => typedError<AppConfig, AppError>(__TAURI_INVOKE("set_config", { patch: ({...patch,monitorVolume:patch.monitorVolume==null?patch.monitorVolume:patch.monitorVolume}) })).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,measuredLatencyMs:v.data.measuredLatencyMs==null?v.data.measuredLatencyMs:v.data.measuredLatencyMs}) } : v) as typeof v)),
 	/**  Open all streams through the fallback chain (FR-02). */
 	startEngine: () => typedError<EngineStatusEvent, AppError>(__TAURI_INVOKE("start_engine")).then((v) => ((v.status === "ok" ? { ...v, data: ({...v.data,engine:v.data.engine==null?v.data.engine:v.data.engine}) } : v) as typeof v)),
@@ -26,6 +30,8 @@ export const commands = {
 	 */
 	setParams: (patch: ParamsPatch) => __TAURI_INVOKE<TuningParams>("set_params", { patch: ({...patch,retuneMs:patch.retuneMs==null?patch.retuneMs:patch.retuneMs,humanize:patch.humanize==null?patch.humanize:patch.humanize,mix:patch.mix==null?patch.mix:patch.mix,gateThresholdDb:patch.gateThresholdDb==null?patch.gateThresholdDb:patch.gateThresholdDb}) }),
 	setBypass: (bypass: boolean) => __TAURI_INVOKE<boolean>("set_bypass", { bypass }),
+	/**  The registered tuning hotkey and any problem registering the configured one. */
+	getHotkeyStatus: () => __TAURI_INVOKE<HotkeyStatus>("get_hotkey_status"),
 	/**  Acoustic loopback test (FR-16). */
 	runLatencyTest: () => typedError<LatencyResult, AppError>(__TAURI_INVOKE("run_latency_test")),
 	/**  VB-Cable, conflicts, Discord session, sidetone and Bluetooth (FR-12, FR-13). */
@@ -111,7 +117,10 @@ export type AppInfo = {
 /**  Capture fallback chain, best first (FR-02). */
 export type BackendTier = "asio" | "wasapiExclusive" | "wasapiSharedLowLatency" | "wasapiShared" | "mock";
 
-/**  Bypass toggled from tray or hotkey (FR-10). */
+/**
+ *  Bypass toggled from tray or hotkey (FR-10). `false` = tuning and
+ *  monitoring on.
+ */
 export type BypassEvent = boolean;
 
 /**  Partial update from the UI (`set_config`). `None` leaves a field alone. */
@@ -204,6 +213,14 @@ export type EngineStatusEvent = {
 export type ErrorEvent = string;
 
 export type ErrorKind = "device" | "deviceInUse" | "notRunning" | "latency" | "unsupported" | "config" | "update" | "internal";
+
+/**  What the UI shows under the hotkey setting. */
+export type HotkeyStatus = {
+	/**  The registered accelerator; `None` if nothing could be registered. */
+	active: string | null,
+	/**  Why the configured hotkey isn't the active one. */
+	problem: string | null,
+};
 
 /**  A VB-Cable endpoint that exists but Windows won't let apps open. */
 export type InactiveCable = {

@@ -14,6 +14,7 @@ use crate::config::{AppConfig, ConfigPatch, Preset};
 use crate::diagnostics::{report, Diagnostics};
 use crate::error::{AppError, AppResult, ErrorKind};
 use crate::events::EngineStatusEvent;
+use crate::hotkey::{self, HotkeyStatus};
 use crate::state::{lock, state};
 use crate::updater::{self, UpdateStatus};
 
@@ -60,17 +61,25 @@ pub fn get_config(app: AppHandle) -> AppConfig {
 }
 
 /// Patch persisted settings (FR-20); rebuilds the engine when devices change.
+/// A new hotkey takes effect right away; if it's invalid or taken, nothing
+/// is saved and the old one keeps working.
 #[tauri::command]
 #[specta::specta]
-pub fn set_config(app: AppHandle, patch: ConfigPatch) -> AppResult<AppConfig> {
+pub fn set_config(app: AppHandle, mut patch: ConfigPatch) -> AppResult<AppConfig> {
     let s = state(&app);
-    let new_hotkey = patch.bypass_hotkey.clone();
+    if let Some(h) = patch.bypass_hotkey.as_mut() {
+        // Sync commands run on the main thread, which serializes changes;
+        // the lock isn't held while the plugin talks to the OS.
+        let current = lock(&s.hotkey).clone();
+        let next =
+            hotkey::change(&app, &current, h).map_err(|e| AppError::new(ErrorKind::Config, e))?;
+        *h = h.trim().to_string();
+        *lock(&s.hotkey) = next;
+        crate::tray::sync(&app, s.controls.bypass());
+    }
     let rebuild = s.update_config(|c| c.apply(patch));
     let c = s.config();
     s.controls.set_monitor(c.monitor_enabled, c.monitor_volume);
-    if let Some(h) = new_hotkey {
-        crate::register_hotkey(&app, &h)?;
-    }
     if rebuild {
         let devices = s.devices().unwrap_or_default();
         let cfg = s.engine_config(&devices);
@@ -191,6 +200,13 @@ pub fn set_params(app: AppHandle, patch: ParamsPatch) -> TuningParams {
 pub fn set_bypass(app: AppHandle, bypass: bool) -> bool {
     state(&app).set_bypass(&app, bypass);
     bypass
+}
+
+/// The registered tuning hotkey and any problem registering the configured one.
+#[tauri::command]
+#[specta::specta]
+pub fn get_hotkey_status(app: AppHandle) -> HotkeyStatus {
+    lock(&state(&app).hotkey).status.clone()
 }
 
 /// Acoustic loopback test (FR-16).

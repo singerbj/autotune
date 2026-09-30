@@ -21,14 +21,14 @@ All are required for v1 except FR-21, which is a stretch goal.
 | --- | --- | --- |
 | FR-01 | Audio | List capture and render devices, flag ASIO drivers and VB-Cable endpoints, and update the list live on device changes. |
 | FR-02 | Audio | Capture the selected mic through the fallback chain: ASIO, WASAPI exclusive, IAudioClient3 shared, standard shared. Show the active tier. |
-| FR-03 | Audio | Monitor the tuned signal to the selected headphones in low-latency shared mode, with an on/off toggle and volume. |
+| FR-03 | Audio | Monitor the tuned signal to the selected headphones in low-latency shared mode, with an on/off toggle and volume. Monitoring is silent while tuning is bypassed (ADR 0010). |
 | FR-04 | Audio | Render the tuned signal to CABLE Input whenever the engine runs, bridged with an adaptive resampler. |
 | FR-05 | Audio | Recover from unplug, replug, and default-device changes within 2 s, with no app restart. |
 | FR-06 | Tuning | Pitch-correct in real time to a chosen key (12) and scale: chromatic, major, natural minor, or a custom note mask. |
 | FR-07 | Tuning | Retune speed from 0 to 200 ms, and humanize from 0 to 100%. |
 | FR-08 | Tuning | Voice range preset Low, Mid, or High sets the lowest tracked pitch to 70, 100, or 150 Hz. |
 | FR-09 | Tuning | Unvoiced audio passes through unshifted; a noise gate has an adjustable threshold. |
-| FR-10 | Tuning | Dry/wet mix, and a click-free bypass (at least 5 ms crossfade) from the UI, tray, and a global hotkey. |
+| FR-10 | Tuning | Dry/wet mix, and a click-free bypass (at least 5 ms crossfade) from the UI, tray, and a global hotkey that can be changed while the app runs. Tuning starts bypassed at launch (ADR 0010). |
 | FR-11 | Tuning | Parameter changes apply live, smoothed over at least 10 ms, with no clicks. |
 | FR-12 | Setup | First-run wizard: choose mic and headphones, detect VB-Cable and conflicts, warn about sidetone and Bluetooth, walk through the Discord checklist, run a latency test. |
 | FR-13 | Setup | Detect a Discord capture session on CABLE Output and show its status. |

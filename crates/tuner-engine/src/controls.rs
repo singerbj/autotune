@@ -145,9 +145,11 @@ impl SharedControls {
         });
     }
 
-    /// Monitor gain the capture thread applies (0 when disabled).
+    /// Monitor gain the capture thread applies: 0 when monitoring is
+    /// disabled or tuning is bypassed, so the headphones only carry your
+    /// voice while tuning is on (the capture thread ramps the change).
     pub fn monitor_gain(&self) -> f32 {
-        if self.monitor_enabled.load(Ordering::Relaxed) {
+        if self.monitor_enabled.load(Ordering::Relaxed) && !self.bypass.load(Ordering::Relaxed) {
             self.monitor_volume.load()
         } else {
             0.0
@@ -208,5 +210,17 @@ mod tests {
         assert_eq!(c.monitor_gain(), 0.0);
         c.set_monitor(true, 7.0);
         assert_eq!(c.monitor_gain(), 1.0);
+    }
+
+    #[test]
+    fn fr03_fr10_bypass_mutes_the_monitor() {
+        let c = SharedControls::default();
+        c.set_monitor(true, 0.5);
+        c.set_bypass(true);
+        assert_eq!(c.monitor_gain(), 0.0);
+        c.set_bypass(false);
+        assert_eq!(c.monitor_gain(), 0.5);
+        assert!(c.toggle_bypass());
+        assert_eq!(c.monitor_gain(), 0.0);
     }
 }

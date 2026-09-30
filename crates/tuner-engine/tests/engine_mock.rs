@@ -97,6 +97,37 @@ fn fr03_monitor_toggle_mutes_headphones_but_not_cable() {
 }
 
 #[test]
+fn fr03_fr10_bypass_mutes_headphones_and_sends_dry_voice_to_cable() {
+    let b = MockBackend::with_default_devices();
+    b.set_signal(MockSignal::Sine {
+        hz: 220.0,
+        amp: 0.3,
+    });
+    let controls = Arc::new(SharedControls::new(
+        &TuningParams {
+            bypass: true,
+            ..Default::default()
+        },
+        true,
+        1.0,
+    ));
+    let engine = Engine::start(&b, &headset_config(), controls.clone()).unwrap();
+    assert!(wait_until(Duration::from_secs(2), || b
+        .rendered("cable-in")
+        .iter()
+        .any(|v| v.abs() > 0.05)));
+    let hp = b.rendered("hp");
+    assert!(!hp.is_empty() && hp.iter().all(|v| v.abs() < 1e-4));
+    // Tuning on (the hotkey): the headphones carry the voice.
+    controls.set_bypass(false);
+    assert!(wait_until(Duration::from_secs(2), || b
+        .rendered("hp")
+        .iter()
+        .any(|v| v.abs() > 0.05)));
+    drop(engine);
+}
+
+#[test]
 fn fr04_missing_cable_is_reported_but_engine_runs() {
     let b = MockBackend::with_default_devices();
     let cfg = EngineConfig {

@@ -19,6 +19,7 @@
     "allow-get-engine-status",
     "allow-set-params",
     "allow-set-bypass",
+    "allow-get-hotkey-status",
     "allow-run-latency-test",
     "allow-run-setup-check",
     "allow-set-route-all-apps",

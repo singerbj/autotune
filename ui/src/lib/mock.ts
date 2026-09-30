@@ -15,6 +15,7 @@ import type {
   EngineStatus,
   EngineStatusEvent,
   events as TauriEvents,
+  HotkeyStatus,
   MeterSnapshot,
   Preset,
   SetupReport,
@@ -202,7 +203,8 @@ const DEFAULT_PARAMS: TuningParams = {
 function initialConfig(): AppConfig {
   return {
     schemaVersion: 1,
-    params: { ...DEFAULT_PARAMS },
+    // Tuning and monitoring start off each launch; the hotkey turns them on.
+    params: { ...DEFAULT_PARAMS, bypass: true },
     captureDevice: null,
     monitorDevice: null,
     monitorEnabled: true,
@@ -230,6 +232,7 @@ interface MockState {
   devices: DeviceInfo[];
   supervisor: SupervisorStatus;
   update: UpdateStatus;
+  hotkey: HotkeyStatus;
   setupChecks: number;
   counters: {
     xruns: number;
@@ -247,6 +250,7 @@ function initialState(): MockState {
     devices: DEVICES.map((d) => ({ ...d })),
     supervisor: { state: "running", lastError: null, restarts: 0, usingFallbackDevice: false },
     update: { state: "idle" },
+    hotkey: { active: "CommandOrControl+Alt+B", problem: null },
     setupChecks: 0,
     counters: {
       xruns: 0,
@@ -288,17 +292,24 @@ const MODIFIERS = new Set([
   "cmd",
 ]);
 
-/** Mirrors the accelerator parser closely enough for the demo. */
+const FUNCTION_KEY = /^F([1-9]|1[0-9]|2[0-4])$/i;
+const KEY =
+  /^([A-Za-z0-9]|(Key[A-Z])|(Digit\d)|(Numpad\d)|Arrow(Up|Down|Left|Right)|Up|Down|Left|Right|Space|Tab|Home|End|Insert|Delete|PageUp|PageDown|Backquote|Minus|Equal|BracketLeft|BracketRight|Backslash|Semicolon|Quote|Comma|Period|Slash|Pause|PrintScreen)$/i;
+
+/** Mirrors `hotkey::parse` in Rust closely enough for the demo. */
 function validateHotkey(accelerator: string): string | null {
-  const parts = accelerator.split("+").map((p) => p.trim());
+  const text = accelerator.trim();
+  if (text === "") return "The hotkey can't be empty.";
+  const parts = text.split("+").map((p) => p.trim());
   const key = parts.at(-1) ?? "";
   const mods = parts.slice(0, -1);
-  if (accelerator.trim() === "") return "The bypass hotkey can't be empty.";
-  if (mods.length === 0) return `"${accelerator}" needs at least one modifier (e.g. Ctrl+Alt+B).`;
   const badMod = mods.find((m) => !MODIFIERS.has(m.toLowerCase()));
-  if (badMod !== undefined) return `Unknown modifier "${badMod}" in "${accelerator}".`;
-  if (!/^([A-Za-z0-9]|F([1-9]|1[0-9]|2[0-4])|Space|Tab|Home|End|Insert|Delete)$/.test(key)) {
-    return `Unknown key "${key}" in "${accelerator}".`;
+  if (badMod !== undefined) return `"${text}" is not a valid hotkey: unknown modifier "${badMod}".`;
+  if (!FUNCTION_KEY.test(key) && !KEY.test(key)) {
+    return `"${text}" is not a valid hotkey: unknown key "${key}".`;
+  }
+  if (mods.length === 0 && !FUNCTION_KEY.test(key)) {
+    return `"${text}" needs a modifier (Ctrl, Alt, Shift or Win), e.g. Ctrl+Alt+B.`;
   }
   return null;
 }
@@ -514,6 +525,9 @@ export function createMockBackend(): MockBackend {
       if (patch.bypassHotkey != null) {
         const problem = validateHotkey(patch.bypassHotkey);
         if (problem !== null) return fail("config", problem);
+        const bypassHotkey = patch.bypassHotkey.trim();
+        patch = { ...patch, bypassHotkey };
+        state.hotkey = { active: bypassHotkey, problem: null };
       }
       const next: AppConfig = { ...state.config };
       if (patch.captureDevice !== undefined) next.captureDevice = patch.captureDevice;
@@ -577,6 +591,8 @@ export function createMockBackend(): MockBackend {
       void bypassEvent.emit(bypass);
       return Promise.resolve(bypass);
     },
+
+    getHotkeyStatus: () => Promise.resolve({ ...state.hotkey }),
 
     runLatencyTest: async () => {
       if (state.supervisor.state !== "running") {

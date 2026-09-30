@@ -12,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "get_engine_status",
     "set_params",
     "set_bypass",
+    "get_hotkey_status",
     "run_latency_test",
     "run_setup_check",
     "set_route_all_apps",

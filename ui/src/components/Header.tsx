@@ -1,7 +1,7 @@
 import { DownloadIcon, PlayIcon, SquareIcon, TimerIcon } from "lucide-react";
 
 import type { SupervisorState } from "@/bindings";
-import { BypassToggle } from "@/components/BypassToggle";
+import { TuningToggle } from "@/components/TuningToggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -104,7 +104,7 @@ export function Header() {
             Update ready — restart
           </Button>
         )}
-        <BypassToggle />
+        <TuningToggle />
         <EngineButton state={supervisor?.state} />
       </div>
     </header>
