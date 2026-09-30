@@ -29,7 +29,9 @@ use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 use windows::Win32::UI::Shell::{
     FOLDERID_LocalAppData, FOLDERID_RoamingAppData, SHGetKnownFolderPath, KF_FLAG_DEFAULT,
 };
-use windows::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetSystemMetrics, MessageBoxW, MB_ICONERROR, MB_OK, SM_REMOTESESSION,
+};
 
 use crate::SignedInUser;
 
@@ -260,4 +262,9 @@ pub(crate) fn error_box(title: &str, text: &str) {
     let (title, text) = (HSTRING::from(title), HSTRING::from(text));
     // SAFETY: both strings outlive the call; no owner window.
     unsafe { MessageBoxW(None, &text, &title, MB_OK | MB_ICONERROR) };
+}
+
+pub(crate) fn is_remote_session() -> bool {
+    // SAFETY: plain query with no pointers.
+    unsafe { GetSystemMetrics(SM_REMOTESESSION) != 0 }
 }

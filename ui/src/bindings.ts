@@ -296,6 +296,8 @@ export type SetupReport = {
 	bluetoothWarning: boolean,
 	/**  "Listen to this device" is on for the selected mic (doubled voice). */
 	sidetoneWarning: boolean,
+	/**  Running over Remote Desktop, where the PC's audio devices are hidden. */
+	remoteSession: boolean,
 };
 
 /**  What a running stream actually negotiated. */
