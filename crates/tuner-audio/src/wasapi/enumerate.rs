@@ -1,18 +1,20 @@
 //! Endpoint enumeration (FR-01).
 
 use windows::Win32::Devices::FunctionDiscovery::{
-    PKEY_Device_ContainerId, PKEY_Device_EnumeratorName, PKEY_Device_FriendlyName,
+    PKEY_DeviceInterface_FriendlyName, PKEY_Device_ContainerId, PKEY_Device_EnumeratorName,
+    PKEY_Device_FriendlyName,
 };
 use windows::Win32::Foundation::PROPERTYKEY;
 use windows::Win32::Media::Audio::{
     eCapture, eCommunications, eConsole, eRender, EDataFlow, IMMDevice, IMMDeviceEnumerator,
-    MMDeviceEnumerator, DEVICE_STATE_ACTIVE,
+    MMDeviceEnumerator, DEVICE_STATE, DEVICE_STATE_ACTIVE, DEVICE_STATE_DISABLED,
+    DEVICE_STATE_UNPLUGGED,
 };
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL, STGM_READ};
 use windows::Win32::UI::Shell::PropertiesSystem::IPropertyStore;
 
 use super::com::{map_err, pcwstr, take_pwstr, wide};
-use crate::types::{is_vb_cable_name, AudioError, DeviceInfo, Direction};
+use crate::types::{is_vb_cable_name, AudioError, DeviceInfo, Direction, InactiveEndpoint};
 
 pub(crate) fn enumerator() -> Result<IMMDeviceEnumerator, AudioError> {
     // SAFETY: COM is initialised on this thread by the caller (ComGuard).
@@ -106,13 +108,60 @@ pub(crate) fn list_devices() -> Result<Vec<DeviceInfo>, AudioError> {
             out.push(DeviceInfo {
                 is_default: console.as_deref() == Some(id.as_str()),
                 is_default_communications: comms.as_deref() == Some(id.as_str()),
-                is_vb_cable: is_vb_cable_name(&name),
+                is_vb_cable: is_vb_cable(store.as_ref(), &name),
                 is_bluetooth: enumerator.to_ascii_uppercase().starts_with("BTH"),
                 asio_driver: None,
                 container_id: get(&PKEY_Device_ContainerId),
                 id,
                 name,
                 direction: dir,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// VB-Cable by endpoint name or, when the user renamed the endpoint, by the
+/// adapter's name ("VB-Audio Virtual Cable").
+fn is_vb_cable(store: Option<&IPropertyStore>, name: &str) -> bool {
+    is_vb_cable_name(name)
+        || store
+            .and_then(|s| prop(s, &PKEY_DeviceInterface_FriendlyName))
+            .is_some_and(|a| is_vb_cable_name(&a))
+}
+
+/// VB-Cable endpoints that are disabled or unplugged. Active endpoints come
+/// from [`list_devices`]; "not present" ones are leftovers of old installs.
+pub(crate) fn inactive_vb_cable_endpoints() -> Result<Vec<InactiveEndpoint>, AudioError> {
+    let en = enumerator()?;
+    let mask = DEVICE_STATE(DEVICE_STATE_DISABLED.0 | DEVICE_STATE_UNPLUGGED.0);
+    let mut out = Vec::new();
+    for dir in [Direction::Capture, Direction::Render] {
+        // SAFETY: plain COM calls on valid interfaces.
+        let coll = unsafe { en.EnumAudioEndpoints(flow(dir), mask) }
+            .map_err(|e| map_err("EnumAudioEndpoints", &e))?;
+        // SAFETY: as above.
+        let count = unsafe { coll.GetCount() }.map_err(|e| map_err("GetCount", &e))?;
+        for i in 0..count {
+            // SAFETY: `i < count`.
+            let Ok(dev) = (unsafe { coll.Item(i) }) else {
+                continue;
+            };
+            // SAFETY: valid endpoint.
+            let store = unsafe { dev.OpenPropertyStore(STGM_READ) }.ok();
+            let name = store
+                .as_ref()
+                .and_then(|s| prop(s, &PKEY_Device_FriendlyName))
+                .unwrap_or_else(|| "Unknown device".into());
+            if !is_vb_cable(store.as_ref(), &name) {
+                continue;
+            }
+            // SAFETY: valid endpoint.
+            let state = unsafe { dev.GetState() }.unwrap_or(DEVICE_STATE_DISABLED);
+            out.push(InactiveEndpoint {
+                name,
+                direction: dir,
+                disabled: state == DEVICE_STATE_DISABLED,
             });
         }
     }

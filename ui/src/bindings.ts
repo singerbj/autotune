@@ -205,6 +205,14 @@ export type ErrorEvent = string;
 
 export type ErrorKind = "device" | "deviceInUse" | "notRunning" | "latency" | "unsupported" | "config" | "update" | "internal";
 
+/**  A VB-Cable endpoint that exists but Windows won't let apps open. */
+export type InactiveCable = {
+	name: string,
+	isCapture: boolean,
+	/**  Turned off in Sound settings (otherwise reported unplugged). */
+	disabled: boolean,
+};
+
 /**  Result of a loopback measurement. */
 export type LatencyResult = {
 	/**  Hardware + buffering round trip (DSP bypassed), ms. */
@@ -273,6 +281,11 @@ export type SetupReport = {
 	vbCableInstalled: boolean,
 	cableInputId: string | null,
 	cableOutputId: string | null,
+	/**
+	 *  Why VB-Cable looks missing: its endpoints exist but are disabled or
+	 *  unplugged (only for sides with no active endpoint).
+	 */
+	inactiveCables: InactiveCable[],
 	/**  Other apps already sending audio into CABLE Input (OBS, music…). */
 	cableConflicts: string[],
 	/**  A Discord process has a capture session on CABLE Output. */

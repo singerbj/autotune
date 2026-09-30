@@ -25,7 +25,8 @@ pub use backend::{
     RenderCallback, RenderRequest, StreamHandle, StreamState, StreamStatus, ThreadPriority,
 };
 pub use types::{
-    is_vb_cable_name, AudioError, BackendTier, DeviceInfo, Direction, StreamInfo, TierAttempt,
+    is_vb_cable_name, AudioError, BackendTier, DeviceInfo, Direction, InactiveEndpoint, StreamInfo,
+    TierAttempt,
 };
 
 /// Re-exported so the engine uses exactly the same ring type.

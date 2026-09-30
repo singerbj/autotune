@@ -8,7 +8,7 @@ use tauri_plugin_autostart::ManagerExt;
 use tuner_audio::DeviceInfo;
 use tuner_dsp::{Scale, TuningParams, VoiceRange};
 use tuner_engine::LatencyResult;
-use tuner_win::{EndpointSummary, SetupInputs, SetupReport};
+use tuner_win::{EndpointSummary, InactiveCable, SetupInputs, SetupReport};
 
 use crate::config::{AppConfig, ConfigPatch, Preset};
 use crate::diagnostics::{report, Diagnostics};
@@ -250,10 +250,22 @@ pub fn run_setup_check(app: AppHandle) -> AppResult<SetupReport> {
             .and_then(|d| tuner_win::endpoint_sessions(&d.id).ok())
             .unwrap_or_default()
     };
+    let inactive: Vec<InactiveCable> = s
+        .backend
+        .inactive_vb_cable_endpoints()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|e| InactiveCable {
+            name: e.name,
+            is_capture: e.direction == tuner_audio::Direction::Capture,
+            disabled: e.disabled,
+        })
+        .collect();
     let cin = sessions(DeviceInfo::is_cable_input);
     let cout = sessions(DeviceInfo::is_cable_output);
     Ok(tuner_win::evaluate_setup(&SetupInputs {
         endpoints: &endpoints,
+        inactive_cables: &inactive,
         selected_mic: mic.as_deref(),
         selected_headphones: hp.as_deref(),
         cable_input_sessions: &cin,

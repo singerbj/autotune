@@ -15,6 +15,17 @@ pub struct EndpointSummary {
     pub is_vb_cable: bool,
 }
 
+/// A VB-Cable endpoint that exists but Windows won't let apps open.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "specta", derive(specta::Type))]
+pub struct InactiveCable {
+    pub name: String,
+    pub is_capture: bool,
+    /// Turned off in Sound settings (otherwise reported unplugged).
+    pub disabled: bool,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
@@ -42,6 +53,9 @@ pub struct SetupReport {
     pub vb_cable_installed: bool,
     pub cable_input_id: Option<String>,
     pub cable_output_id: Option<String>,
+    /// Why VB-Cable looks missing: its endpoints exist but are disabled or
+    /// unplugged (only for sides with no active endpoint).
+    pub inactive_cables: Vec<InactiveCable>,
     /// Other apps already sending audio into CABLE Input (OBS, music…).
     pub cable_conflicts: Vec<String>,
     /// A Discord process has a capture session on CABLE Output.
@@ -63,6 +77,7 @@ pub fn is_discord_process(name: &str) -> bool {
 
 pub struct SetupInputs<'a> {
     pub endpoints: &'a [EndpointSummary],
+    pub inactive_cables: &'a [InactiveCable],
     pub selected_mic: Option<&'a str>,
     pub selected_headphones: Option<&'a str>,
     pub cable_input_sessions: &'a [AudioSession],
@@ -99,6 +114,18 @@ pub fn evaluate_setup(i: &SetupInputs<'_>) -> SetupReport {
         vb_cable_installed: cable_in.is_some() && cable_out.is_some(),
         cable_input_id: cable_in.map(|e| e.id.clone()),
         cable_output_id: cable_out.map(|e| e.id.clone()),
+        inactive_cables: i
+            .inactive_cables
+            .iter()
+            .filter(|c| {
+                if c.is_capture {
+                    cable_out.is_none()
+                } else {
+                    cable_in.is_none()
+                }
+            })
+            .cloned()
+            .collect(),
         cable_conflicts: conflicts,
         discord_detected: !discord.is_empty(),
         discord_active: discord.iter().any(|s| s.state == SessionState::Active),
@@ -146,6 +173,7 @@ mod tests {
     ) -> SetupInputs<'a> {
         SetupInputs {
             endpoints: eps,
+            inactive_cables: &[],
             selected_mic: Some("mic"),
             selected_headphones: Some("hp"),
             cable_input_sessions: cin,
@@ -164,6 +192,29 @@ mod tests {
         assert_eq!(r.cable_output_id.as_deref(), Some("cout"));
         let no_cable: Vec<_> = eps.into_iter().filter(|e| !e.is_vb_cable).collect();
         assert!(!evaluate_setup(&inputs(&no_cable, &[], &[])).vb_cable_installed);
+    }
+
+    #[test]
+    fn fr12_reports_inactive_cable_sides_only_when_missing() {
+        let inactive = |name: &str, cap: bool| InactiveCable {
+            name: name.into(),
+            is_capture: cap,
+            disabled: true,
+        };
+        let stale = [inactive("old in", false), inactive("old out", true)];
+        let eps = endpoints();
+        let mut i = inputs(&eps, &[], &[]);
+        i.inactive_cables = &stale;
+        assert!(evaluate_setup(&i).inactive_cables.is_empty());
+
+        // CABLE Output disabled in Sound settings: only it is reported.
+        let eps: Vec<_> = eps.into_iter().filter(|e| e.id != "cout").collect();
+        let off = [inactive("CABLE Output (VB-Audio Virtual Cable)", true)];
+        let mut i = inputs(&eps, &[], &[]);
+        i.inactive_cables = &off;
+        let r = evaluate_setup(&i);
+        assert!(!r.vb_cable_installed);
+        assert_eq!(r.inactive_cables, off.to_vec());
     }
 
     #[test]
