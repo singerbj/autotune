@@ -23,6 +23,7 @@ import {
   useSetupCheck,
   useStartEngine,
 } from "@/lib/queries";
+import { hotkeyLabel } from "@/lib/hotkey";
 import { errorMessage } from "@/lib/result";
 
 function Checking() {
@@ -304,6 +305,8 @@ export function LatencyStep() {
 }
 
 export function DoneStep() {
+  const config = useConfig();
+  const hotkey = config.data ? hotkeyLabel(config.data.bypassHotkey) : "the tuning hotkey";
   return (
     <div className="flex flex-col gap-3 text-sm">
       <p className="flex items-center gap-2 text-base font-medium">
@@ -311,8 +314,10 @@ export function DoneStep() {
         You're all set.
       </p>
       <p className="text-muted-foreground">
-        Pick your key and scale on the Tune tab and start singing. Closing the window keeps Voice
-        Tuner running in the tray; use the bypass hotkey to hear your dry voice at any time.
+        Pick your key and scale on the Tune tab. Tuning and headphone monitoring start off: press{" "}
+        <kbd className="font-mono font-semibold">{hotkey}</kbd> to turn them on, and again to turn
+        them off (change the hotkey in Settings). Closing the window keeps TunedUp running in the
+        tray.
       </p>
     </div>
   );

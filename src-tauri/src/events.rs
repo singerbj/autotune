@@ -29,7 +29,8 @@ pub struct DevicesChangedEvent(pub Vec<DeviceInfo>);
 #[derive(Serialize, Deserialize, Debug, Clone, Type, Event)]
 pub struct ErrorEvent(pub String);
 
-/// Bypass toggled from tray or hotkey (FR-10).
+/// Bypass toggled from tray or hotkey (FR-10). `false` = tuning and
+/// monitoring on.
 #[derive(Serialize, Deserialize, Debug, Clone, Type, Event)]
 pub struct BypassEvent(pub bool);
 

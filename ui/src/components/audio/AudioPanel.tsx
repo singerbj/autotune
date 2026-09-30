@@ -68,7 +68,10 @@ export function AudioPanel() {
       <Card>
         <CardHeader>
           <CardTitle>Monitoring</CardTitle>
-          <CardDescription>Hear the tuned voice in your headphones.</CardDescription>
+          <CardDescription>
+            Hear the tuned voice in your headphones while tuning is on (the Tuning button or
+            hotkey).
+          </CardDescription>
         </CardHeader>
         <SettingRow htmlFor="monitor-enabled" label="Monitor in headphones">
           <Switch

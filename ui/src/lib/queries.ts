@@ -21,6 +21,7 @@ export const queryKeys = {
   devices: ["devices"],
   updateStatus: ["updateStatus"],
   setupCheck: ["setupCheck"],
+  hotkeyStatus: ["hotkeyStatus"],
 } as const;
 
 // --- cache writers (used by mutations and event listeners) -----------------
@@ -78,6 +79,14 @@ export function useDevices() {
   });
 }
 
+/** The registered tuning hotkey and why the configured one isn't, if so (FR-10). */
+export function useHotkeyStatus() {
+  return useQuery({
+    queryKey: queryKeys.hotkeyStatus,
+    queryFn: () => commands.getHotkeyStatus(),
+  });
+}
+
 export function useUpdateStatus() {
   return useQuery({
     queryKey: queryKeys.updateStatus,
@@ -110,7 +119,11 @@ export function useSetConfig(options: { inlineError?: boolean } = {}) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (patch: ConfigPatch) => unwrap(commands.setConfig(patch)),
-    onSuccess: (config) => qc.setQueryData(queryKeys.config, config),
+    onSuccess: (config, patch) => {
+      qc.setQueryData(queryKeys.config, config);
+      if (patch.bypassHotkey != null)
+        void qc.invalidateQueries({ queryKey: queryKeys.hotkeyStatus });
+    },
     meta: { inlineError: options.inlineError ?? false, errorTitle: "Couldn't save setting" },
   });
 }
@@ -120,7 +133,7 @@ export function useSetBypass() {
   return useMutation({
     mutationFn: (bypass: boolean) => commands.setBypass(bypass),
     onSuccess: (bypass) => setBypassCache(qc, bypass),
-    meta: { errorTitle: "Couldn't toggle bypass" },
+    meta: { errorTitle: "Couldn't turn tuning on or off" },
   });
 }
 

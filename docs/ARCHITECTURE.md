@@ -194,8 +194,8 @@ Rust owns all state; the TypeScript frontend is a thin, typed view over commands
 
 **Shell features**
 
-- System tray with a bypass toggle; closing the window hides it to the tray.
-- Global bypass hotkey (`tauri-plugin-global-shortcut`), single instance (`tauri-plugin-single-instance`), optional launch at login (`tauri-plugin-autostart`).
+- System tray with a tuning on/off toggle; closing the window hides it to the tray.
+- Global tuning on/off hotkey (`tauri-plugin-global-shortcut`), changeable while running; tuning and monitoring start off (ADR 0010), single instance (`tauri-plugin-single-instance`), optional launch at login (`tauri-plugin-autostart`).
 - Config lives in `%APPDATA%\<app>\config.json` via serde, with a schema version for migrations.
 - Tauri capabilities expose only the commands above; the webview loads no remote content.
 

@@ -1,17 +1,25 @@
-import { EyeOffIcon, PowerIcon, RefreshCwIcon, RocketIcon, WandSparklesIcon } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import {
+  EyeOffIcon,
+  KeyboardIcon,
+  PowerIcon,
+  RefreshCwIcon,
+  RocketIcon,
+  WandSparklesIcon,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 
 import { SettingRow } from "@/components/SettingRow";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { commands } from "@/lib/api";
+import { acceleratorFor, DEFAULT_HOTKEY, hotkeyKeys, hotkeyLabel } from "@/lib/hotkey";
 import {
   useAppInfo,
   useCheckForUpdate,
   useConfig,
+  useHotkeyStatus,
   useInstallUpdate,
   useLaunchAtLogin,
   useSetConfig,
@@ -19,6 +27,7 @@ import {
 } from "@/lib/queries";
 import { errorMessage } from "@/lib/result";
 import { toast, toastError } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 import { UpdateStatusView } from "./UpdateStatusView";
 
@@ -26,56 +35,114 @@ function run(label: string, action: () => Promise<void>): void {
   action().catch((error: unknown) => toastError(label, errorMessage(error)));
 }
 
-/** FR-20: global bypass hotkey as a Tauri accelerator string. */
+/**
+ * FR-10/FR-20: the global hotkey that turns tuning and monitoring on and off.
+ * Click, then press the keys; the new hotkey works right away. Esc cancels.
+ */
 function HotkeyField({ current }: { current: string }) {
-  const [draft, setDraft] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
   const setConfig = useSetConfig({ inlineError: true });
-  const value = draft ?? current;
-  const dirty = draft !== null && draft !== current;
+  const status = useHotkeyStatus();
+  const { mutate, reset } = setConfig;
 
-  const onSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    setConfig.mutate(
-      { bypassHotkey: value.trim() },
-      {
-        onSuccess: () => {
-          setDraft(null);
-          toast({ title: "Hotkey saved", variant: "success" });
+  const save = useCallback(
+    (bypassHotkey: string) =>
+      mutate(
+        { bypassHotkey },
+        {
+          onSuccess: () =>
+            toast({ title: `Hotkey set to ${hotkeyLabel(bypassHotkey)}`, variant: "success" }),
         },
-      },
-    );
-  };
+      ),
+    [mutate],
+  );
 
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.code === "Escape" && !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey) {
+        setCapturing(false);
+        return;
+      }
+      const accelerator = acceleratorFor(e);
+      if (accelerator) {
+        setCapturing(false);
+        save(accelerator);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [capturing, save]);
+
+  const problem = status.data?.problem;
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-2">
-      <Label htmlFor="bypass-hotkey">Bypass hotkey</Label>
+    <div className="flex flex-col gap-2">
+      <Label id="tuning-hotkey-label">Tuning hotkey</Label>
       <div className="flex gap-2">
-        <Input
-          id="bypass-hotkey"
-          className="font-mono"
-          value={value}
-          spellCheck={false}
-          aria-invalid={setConfig.isError}
-          aria-describedby="bypass-hotkey-help"
-          onChange={(e) => {
-            setDraft(e.target.value);
-            setConfig.reset();
+        <div
+          aria-labelledby="tuning-hotkey-label"
+          aria-live="polite"
+          className={cn(
+            "flex min-h-9 flex-1 items-center gap-1 rounded-md border bg-background px-3 text-sm",
+            capturing && "border-primary ring-2 ring-primary/30",
+            setConfig.isError && !capturing && "border-destructive",
+          )}
+        >
+          {capturing ? (
+            <span className="text-primary">Press a key combination (Esc cancels)</span>
+          ) : (
+            hotkeyKeys(current).map((key) => (
+              <kbd
+                key={key}
+                className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs font-semibold"
+              >
+                {key}
+              </kbd>
+            ))
+          )}
+        </div>
+        <Button
+          variant="secondary"
+          aria-describedby="tuning-hotkey-help"
+          disabled={setConfig.isPending}
+          onClick={() => {
+            reset();
+            setCapturing((c) => !c);
           }}
-        />
-        <Button type="submit" variant="secondary" disabled={!dirty || setConfig.isPending}>
-          Save
+        >
+          <KeyboardIcon aria-hidden />
+          {capturing ? "Cancel" : "Change…"}
         </Button>
+        {current !== DEFAULT_HOTKEY && !capturing && (
+          <Button
+            variant="ghost"
+            disabled={setConfig.isPending}
+            onClick={() => {
+              reset();
+              save(DEFAULT_HOTKEY);
+            }}
+          >
+            Reset
+          </Button>
+        )}
       </div>
       {setConfig.isError ? (
-        <p id="bypass-hotkey-help" role="alert" className="text-xs text-destructive">
+        <p id="tuning-hotkey-help" role="alert" className="text-xs text-destructive">
           {errorMessage(setConfig.error)}
         </p>
+      ) : problem ? (
+        <p id="tuning-hotkey-help" role="alert" className="text-xs text-warning">
+          {problem}
+        </p>
       ) : (
-        <p id="bypass-hotkey-help" className="text-xs text-muted-foreground">
-          Works even when the window is hidden, e.g. <code>CommandOrControl+Alt+B</code>.
+        <p id="tuning-hotkey-help" className="text-xs text-muted-foreground">
+          Turns tuning and headphone monitoring on or off, even when the window is hidden. Both
+          start off each time TunedUp starts.
         </p>
       )}
-    </form>
+    </div>
   );
 }
 

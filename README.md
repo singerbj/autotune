@@ -8,7 +8,8 @@ through VB-Cable.
 - **Tuning:** key + scale (chromatic, major, natural minor, custom notes),
   retune speed 0–200 ms, humanize, voice-range presets that set the DSP
   latency (Low 14 ms / Mid 10 ms / High 7 ms), dry/wet mix, noise gate,
-  click-free bypass from the UI, tray or a global hotkey, and named presets.
+  named presets, and a global hotkey (changeable in Settings) that turns
+  tuning and headphone monitoring on and off together — both start off.
 - **Audio:** WASAPI exclusive → IAudioClient3 low-latency shared → shared
   fallback chain (ASIO tier behind a feature), shared-mode headphone monitor,
   adaptive resampling into VB-Cable, recovery from unplug/replug in < 2 s.

@@ -34,16 +34,44 @@ describe("App shell", () => {
     expect(screen.getByText("Headset Microphone (Arctis 7)")).toBeInTheDocument();
   });
 
-  it("FR-20: shows the AppError message for an invalid hotkey", async () => {
+  it("FR-10/FR-20: records a new tuning hotkey and applies it", async () => {
+    const setConfig = vi.spyOn(commands, "setConfig");
     const { user } = renderWithClient(<App />);
     await user.click(await screen.findByRole("tab", { name: "Settings" }));
-    const field = await screen.findByRole("textbox", { name: "Bypass hotkey" });
-    await user.clear(field);
-    await user.type(field, "Hyper+B");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(await screen.findByRole("button", { name: /Change/ }));
+    expect(screen.getByText(/Press a key combination/)).toBeInTheDocument();
+    await user.keyboard("{Control>}{Shift>}t{/Shift}{/Control}");
+    expect(setConfig).toHaveBeenCalledWith({ bypassHotkey: "Ctrl+Shift+T" });
+    expect(await screen.findByText("T", { selector: "kbd" })).toBeInTheDocument();
+    // The header toggle names the new hotkey.
     await waitFor(() =>
-      expect(screen.getByRole("alert")).toHaveTextContent('Unknown modifier "Hyper"'),
+      expect(screen.getByRole("button", { name: "Tuning" })).toHaveAttribute(
+        "title",
+        expect.stringContaining("Ctrl+Shift+T"),
+      ),
     );
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    expect(setConfig).toHaveBeenLastCalledWith({ bypassHotkey: "CommandOrControl+Alt+B" });
+  });
+
+  it("FR-20: shows the AppError message for an invalid hotkey and keeps the old one", async () => {
+    const { user } = renderWithClient(<App />);
+    await user.click(await screen.findByRole("tab", { name: "Settings" }));
+    await user.click(await screen.findByRole("button", { name: /Change/ }));
+    await user.keyboard("b");
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("needs a modifier"));
+    expect(screen.getByText("B", { selector: "kbd" })).toBeInTheDocument();
+    expect(screen.getByText("Alt", { selector: "kbd" })).toBeInTheDocument();
+  });
+
+  it("FR-20: Esc cancels recording a hotkey", async () => {
+    const setConfig = vi.spyOn(commands, "setConfig");
+    const { user } = renderWithClient(<App />);
+    await user.click(await screen.findByRole("tab", { name: "Settings" }));
+    await user.click(await screen.findByRole("button", { name: /Change/ }));
+    await user.keyboard("{Escape}");
+    expect(screen.queryByText(/Press a key combination/)).not.toBeInTheDocument();
+    expect(setConfig).not.toHaveBeenCalled();
   });
 
   it("FR-22: shows the update-ready button after a check", async () => {

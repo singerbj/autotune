@@ -15,3 +15,4 @@ docs/decisions/ instead of silently diverging").
 | [0007](0007-product-name-and-identifier.md) | Product name and identifier | Accepted |
 | [0008](0008-vb-cable-buffer-size.md) | VB-Cable internal buffer size is left to the user | Accepted |
 | [0009](0009-elevated-as-another-account.md) | Elevated as another account (Administrator Protection) | Accepted |
+| [0010](0010-tuning-hotkey-gates-monitoring.md) | The tuning hotkey turns tuning and monitoring on together, off at launch | Accepted |

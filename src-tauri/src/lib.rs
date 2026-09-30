@@ -8,6 +8,7 @@ pub mod config;
 pub mod diagnostics;
 pub mod error;
 pub mod events;
+pub mod hotkey;
 pub mod state;
 pub mod tray;
 pub mod updater;
@@ -17,11 +18,10 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::ShortcutState;
 use tauri_specta::{collect_commands, collect_events, Builder, Event};
 
 use crate::config::ConfigStore;
-use crate::error::{AppError, AppResult, ErrorKind};
 use crate::events::{DevicesChangedEvent, MetersEvent};
 use crate::state::{lock, state, AppState};
 
@@ -43,6 +43,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::get_engine_status,
             commands::set_params,
             commands::set_bypass,
+            commands::get_hotkey_status,
             commands::run_latency_test,
             commands::run_setup_check,
             commands::set_route_all_apps,
@@ -244,20 +245,6 @@ pub fn quit(app: &AppHandle) {
     app.exit(0);
 }
 
-pub fn register_hotkey(app: &AppHandle, accelerator: &str) -> AppResult<()> {
-    let gs = app.global_shortcut();
-    let _ = gs.unregister_all();
-    if accelerator.trim().is_empty() {
-        return Ok(());
-    }
-    gs.register(accelerator).map_err(|e| {
-        AppError::new(
-            ErrorKind::Config,
-            format!("Could not register hotkey \"{accelerator}\": {e}"),
-        )
-    })
-}
-
 /// Control loop: supervisor ticks (FR-05), 30 Hz meters (FR-17), device
 /// list updates (FR-01) and debounced config saves (FR-20).
 fn spawn_control_loop(app: AppHandle) {
@@ -349,6 +336,8 @@ pub fn run() -> i32 {
         ))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
+                // Only the tuning hotkey is registered: each press turns
+                // tuning and monitoring on or off (FR-10).
                 .with_handler(|app, _shortcut, event| {
                     if event.state == ShortcutState::Pressed {
                         let s = state(app);
@@ -373,9 +362,8 @@ pub fn run() -> i32 {
 
             let s = state(&handle);
             let cfg = s.config();
-            if let Err(e) = register_hotkey(&handle, &cfg.bypass_hotkey) {
-                tracing::warn!("{e}");
-            }
+            *lock(&s.hotkey) = hotkey::register(&handle, &cfg.bypass_hotkey);
+            tray::sync(&handle, s.controls.bypass());
 
             let dirty = s.devices_dirty.clone();
             match tuner_win::DeviceWatcher::start(move |_| dirty.store(true, Ordering::Release)) {

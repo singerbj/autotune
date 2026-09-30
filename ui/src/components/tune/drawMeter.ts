@@ -127,7 +127,7 @@ export function drawMeter(
   ctx.fillText("TARGET", col2, pad + 10);
   ctx.fillStyle = target !== null && voiced ? c.primary : c.mutedForeground;
   ctx.font = "600 34px system-ui, sans-serif";
-  ctx.fillText(view.bypass ? "bypass" : (target ?? "—"), col2, pad + 48);
+  ctx.fillText(view.bypass ? "off" : (target ?? "—"), col2, pad + 48);
 
   // --- indicators ----------------------------------------------------------
   let px = width - pad;

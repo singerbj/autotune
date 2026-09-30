@@ -14,6 +14,7 @@ use tuner_win::{DefaultEndpointControl, DeviceWatcher, RouteAllApps};
 use crate::config::{AppConfig, ConfigStore, SharedConfig};
 use crate::error::AppResult;
 use crate::events::{BypassEvent, EngineStatusEvent};
+use crate::hotkey::Registration;
 use crate::updater::UpdaterState;
 
 pub struct AppState {
@@ -23,6 +24,8 @@ pub struct AppState {
     pub backend: Arc<dyn AudioBackend>,
     pub endpoint_control: Box<dyn DefaultEndpointControl>,
     pub updater: Mutex<UpdaterState>,
+    /// The registered tuning on/off hotkey.
+    pub hotkey: Mutex<Registration>,
     pub watcher: Mutex<Option<DeviceWatcher>>,
     /// Set from the device-notification thread; handled by the control loop.
     pub devices_dirty: Arc<AtomicBool>,
@@ -38,12 +41,15 @@ pub fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
 }
 
 impl AppState {
+    /// Tuning starts off (bypassed, headphones silent) whatever was saved;
+    /// the hotkey, tray or UI turns it on.
     pub fn new(
-        config: ConfigStore,
+        mut config: ConfigStore,
         backend: Arc<dyn AudioBackend>,
         log_dir: PathBuf,
         first_run_arg: bool,
     ) -> Self {
+        config.config.params.bypass = true;
         let c = &config.config;
         let controls = Arc::new(SharedControls::new(
             &c.params,
@@ -57,6 +63,7 @@ impl AppState {
             backend,
             endpoint_control: tuner_win::default_endpoint_control(),
             updater: Mutex::new(UpdaterState::default()),
+            hotkey: Mutex::new(Registration::default()),
             watcher: Mutex::new(None),
             devices_dirty: Arc::new(AtomicBool::new(false)),
             config_dirty: AtomicBool::new(false),
@@ -132,4 +139,29 @@ impl AppState {
 
 pub fn state(app: &AppHandle) -> tauri::State<'_, AppState> {
     app.state::<AppState>()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fr10_tuning_and_monitoring_start_off() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut store = ConfigStore::load(dir.path().join("config.json"));
+        store.config.params.bypass = false;
+        store.config.monitor_enabled = true;
+        let s = AppState::new(
+            store,
+            Arc::new(tuner_audio::mock::MockBackend::with_default_devices()),
+            dir.path().into(),
+            false,
+        );
+        assert!(s.controls.bypass());
+        assert!(s.config().params.bypass);
+        assert_eq!(s.controls.monitor_gain(), 0.0);
+        // The hotkey / tray / UI path turns both on.
+        s.controls.set_bypass(false);
+        assert!(s.controls.monitor_gain() > 0.0);
+    }
 }
