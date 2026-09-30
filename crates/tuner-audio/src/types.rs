@@ -90,6 +90,16 @@ pub fn is_vb_cable_name(name: &str) -> bool {
         || n.contains("vb-audio virtual cable")
 }
 
+/// A VB-Cable endpoint Windows knows about but won't let apps open: turned
+/// off in Sound settings, or reported unplugged.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InactiveEndpoint {
+    pub name: String,
+    pub direction: Direction,
+    /// Disabled by the user (otherwise unplugged).
+    pub disabled: bool,
+}
+
 /// What a running stream actually negotiated.
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -173,6 +183,8 @@ mod tests {
         assert!(is_vb_cable_name("CABLE Output (VB-Audio Virtual Cable)"));
         assert!(!is_vb_cable_name("Headset Microphone (Arctis 7)"));
         assert!(!is_vb_cable_name("Cable modem speaker"));
+        // Adapter name, which survives renaming the endpoint.
+        assert!(is_vb_cable_name("VB-Audio Virtual Cable"));
     }
 
     #[test]

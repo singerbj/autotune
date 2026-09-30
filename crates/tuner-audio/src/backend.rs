@@ -4,7 +4,9 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
-use crate::types::{AudioError, BackendTier, DeviceInfo, StreamInfo, TierAttempt};
+use crate::types::{
+    AudioError, BackendTier, DeviceInfo, InactiveEndpoint, StreamInfo, TierAttempt,
+};
 
 /// Per-callback facts from the stream thread.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -88,6 +90,11 @@ pub trait AudioBackend: Send + Sync {
     fn name(&self) -> &'static str;
     /// All active capture and render endpoints (FR-01).
     fn list_devices(&self) -> Result<Vec<DeviceInfo>, AudioError>;
+    /// VB-Cable endpoints that exist but are disabled or unplugged, so the
+    /// setup check can say why the cable is missing from [`Self::list_devices`].
+    fn inactive_vb_cable_endpoints(&self) -> Result<Vec<InactiveEndpoint>, AudioError> {
+        Ok(Vec::new())
+    }
     /// Open a capture stream through the fallback chain (FR-02).
     fn open_capture(
         &self,

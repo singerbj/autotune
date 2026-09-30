@@ -21,8 +21,8 @@ mod win;
 
 pub use routing::{DefaultEndpointControl, Role, RouteAllApps, RoutingBackup, RoutingStore};
 pub use setup::{
-    evaluate_setup, is_discord_process, AudioSession, EndpointSummary, SessionState, SetupInputs,
-    SetupReport,
+    evaluate_setup, is_discord_process, AudioSession, EndpointSummary, InactiveCable, SessionState,
+    SetupInputs, SetupReport,
 };
 
 /// Errors from Windows integration.

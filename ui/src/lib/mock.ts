@@ -404,6 +404,7 @@ export function createMockBackend(): MockBackend {
       vbCableInstalled: cableInput !== undefined && cableOutput !== undefined,
       cableInputId: cableInput?.id ?? null,
       cableOutputId: cableOutput?.id ?? null,
+      inactiveCables: [],
       cableConflicts: ["obs64.exe"],
       discordDetected: state.setupChecks >= 3,
       discordActive: state.setupChecks >= 5,

@@ -11,7 +11,7 @@ pub use com::ComGuard;
 use crate::backend::{
     AudioBackend, CaptureCallback, CaptureRequest, RenderCallback, RenderRequest, StreamHandle,
 };
-use crate::types::{AudioError, DeviceInfo};
+use crate::types::{AudioError, DeviceInfo, InactiveEndpoint};
 
 /// The default Windows backend. When built with the `asio` feature, capture
 /// devices that belong to an installed ASIO driver try ASIO first (FR-02).
@@ -44,6 +44,11 @@ impl AudioBackend for WasapiBackend {
             asio.tag_devices(&mut devices);
         }
         Ok(devices)
+    }
+
+    fn inactive_vb_cable_endpoints(&self) -> Result<Vec<InactiveEndpoint>, AudioError> {
+        let _com = ComGuard::init();
+        enumerate::inactive_vb_cable_endpoints()
     }
 
     fn open_capture(

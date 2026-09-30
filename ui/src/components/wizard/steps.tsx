@@ -14,6 +14,7 @@ import { DeviceSelection } from "@/components/audio/DeviceSelection";
 import { LatencyTest } from "@/components/diagnostics/LatencyTest";
 import { SettingRow } from "@/components/SettingRow";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   useConfig,
@@ -87,13 +88,44 @@ export function CableStep() {
       ) : (
         <Alert variant="warning">
           <CircleXIcon aria-hidden />
-          <div className="flex flex-col gap-1">
-            <span className="font-medium">VB-Cable was not found.</span>
-            <span>
-              The TunedUp installer normally installs it for you. Re-run the installer (or install
-              VB-Cable from vb-audio.com); Windows may need a reboot before the cable appears. You
-              can still use monitoring without it.
-            </span>
+          <div className="flex flex-col gap-2">
+            {report.inactiveCables.length > 0 ? (
+              <>
+                <span className="font-medium">VB-Cable is installed, but Windows has it off.</span>
+                <ul className="list-disc pl-5">
+                  {report.inactiveCables.map((c) => (
+                    <li key={`${c.isCapture ? "rec" : "play"}:${c.name}`}>
+                      <strong>{c.name}</strong>{" "}
+                      {c.disabled ? "is disabled" : "is reported unplugged"} under{" "}
+                      {c.isCapture ? "Recording" : "Playback"} devices.
+                    </li>
+                  ))}
+                </ul>
+                <span>
+                  Press Win+R, run <strong>mmsys.cpl</strong>, open that tab, right-click the list
+                  and tick <strong>Show Disabled Devices</strong>, then right-click the cable and
+                  choose <strong>Enable</strong>.
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-medium">VB-Cable was not found.</span>
+                <span>
+                  The TunedUp installer normally installs it for you. Re-run the installer (or
+                  install VB-Cable from vb-audio.com); Windows may need a reboot before the cable
+                  appears. You can still use monitoring without it.
+                </span>
+              </>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="self-start"
+              disabled={check.isFetching}
+              onClick={() => void check.refetch()}
+            >
+              Check again
+            </Button>
           </div>
         </Alert>
       )}
