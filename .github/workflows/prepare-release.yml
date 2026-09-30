@@ -1,0 +1,122 @@
+name: Prepare release
+
+# Run from the Actions tab on the default branch to cut a release. It:
+#   1. bumps the version (scripts/release/version.ts: Cargo.toml, Cargo.lock, package.json,
+#      ui/package.json, package-lock.json)
+#   2. commits that and pushes the tag vX.Y.Z in one atomic push
+#   3. the tag starts Release, which builds, signs and publishes it
+#
+# It pushes with a GitHub App token when RELEASE_APP_CLIENT_ID is set: that can bypass branch and
+# tag rulesets, and the tag push starts Release by itself. Without the App it pushes with
+# GITHUB_TOKEN (Actions must be allowed to push to the default branch) and starts Release
+# itself, since tags pushed with GITHUB_TOKEN don't start workflows. See docs/RELEASING.md.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump (npm rules; patch on a pre-release releases it)
+        type: choice
+        options: [patch, minor, major, prerelease, prepatch, preminor, premajor]
+        default: patch
+      version:
+        description: Exact version instead (X.Y.Z or X.Y.Z-beta.N; overrides the bump)
+        type: string
+        required: false
+      preid:
+        description: Pre-release id, for pre* bumps
+        type: string
+        default: beta
+      dry-run:
+        description: Dry run (show the changes, push nothing)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Bump, commit and tag
+    runs-on: ubuntu-latest
+    # Holds the App's private key: give it required reviewers and limit it to the default branch.
+    environment: release-prep
+    permissions:
+      contents: write # push the commit and tag without the App
+      actions: write # start Release without the App
+    steps:
+      - name: Must run on the default branch
+        if: github.ref_name != github.event.repository.default_branch
+        run: |
+          echo "::error::Run this workflow on ${{ github.event.repository.default_branch }}, not $GITHUB_REF_NAME."
+          exit 1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Bump the version
+        id: bump
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION: ${{ inputs.version }}
+          PREID: ${{ inputs.preid }}
+        run: |
+          if [ -n "$VERSION" ]; then
+            version=$(node scripts/release/version.ts set "$VERSION")
+          else
+            version=$(node scripts/release/version.ts bump "$BUMP" "$PREID")
+          fi
+          tag=$(node scripts/release/version.ts tag)
+          if git rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
+            echo "::error::Tag $tag already exists."
+            exit 1
+          fi
+          # Release builds with --locked, so catch a stale Cargo.lock here.
+          cargo metadata --locked --format-version 1 --manifest-path Cargo.toml > /dev/null
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          git diff
+      - name: Generate an App token
+        if: ${{ !inputs.dry-run && vars.RELEASE_APP_CLIENT_ID != '' }}
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Commit, tag and push
+        if: ${{ !inputs.dry-run }}
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.bump.outputs.version }}
+          TAG: ${{ steps.bump.outputs.tag }}
+          TITLE: TunedUp
+        run: |
+          if [ -n "$APP_TOKEN" ]; then
+            token=$APP_TOKEN bot="${APP_SLUG}[bot]"
+            id=$(GH_TOKEN=$APP_TOKEN gh api "/users/$bot" --jq .id)
+          else
+            token=$GH_TOKEN bot="github-actions[bot]" id=41898282
+          fi
+          git config user.name "$bot"
+          git config user.email "$id+$bot@users.noreply.github.com"
+          git commit -am "chore(release): $TAG"
+          git tag -a "$TAG" -m "$TITLE $VERSION"
+          # Atomic: the tag is only created if the branch took the commit (it fails if the branch moved).
+          auth=$(printf 'x-access-token:%s' "$token" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c http.extraheader="AUTHORIZATION: basic $auth" push --atomic origin "HEAD:refs/heads/$GITHUB_REF_NAME" "refs/tags/$TAG"
+          if [ -z "$APP_TOKEN" ]; then
+            gh workflow run release.yml --ref "$TAG"
+          fi
+          echo "Pushed $TAG. Release takes it from here: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/workflows/release.yml" >> "$GITHUB_STEP_SUMMARY"

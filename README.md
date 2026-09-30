@@ -28,8 +28,8 @@ requirements in [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md), deviations in
 
 ## Install
 
-1. Download `TunedUp_<version>_x64-setup.exe` from the
-   [latest release](https://github.com/singerbj/tunedup/releases/latest).
+1. Download [`tunedup-setup.exe`](https://github.com/singerbj/tunedup/releases/latest/download/tunedup-setup.exe)
+   from the [latest release](https://github.com/singerbj/tunedup/releases/latest).
 2. Run it and accept the single UAC prompt. If VB-Cable is not installed yet
    the installer installs it silently and asks for one reboot; after the
    reboot the app opens in the setup wizard.
@@ -37,7 +37,7 @@ requirements in [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md), deviations in
    *CABLE Output (VB-Audio Virtual Cable)* and turn off Noise Suppression,
    Echo Cancellation and Automatic Gain Control.
 
-Silent install for managed machines: `TunedUp_<version>_x64-setup.exe /S`
+Silent install for managed machines: `tunedup-setup.exe /S`
 (set `TUNEDUP_SKIP_VBCABLE=1` to skip the driver).
 
 Requirements: Windows 10 22H2 or Windows 11, x64. WebView2 is installed
@@ -45,7 +45,7 @@ automatically if missing.
 
 ## Updates
 
-The app checks GitHub Releases shortly after launch and every six hours,
+The app checks GitHub Releases a minute after launch and every six hours,
 downloads new versions in the background, verifies their signature, and
 shows **Update ready**. Click it (or use the tray, or just quit) to install;
 your settings are kept. Turn automatic checks off in *Settings*. Details:

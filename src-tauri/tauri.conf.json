@@ -46,7 +46,7 @@
       "icons/icon.ico",
       "icons/icon.png"
     ],
-    "createUpdaterArtifacts": true,
+    "createUpdaterArtifacts": false,
     "resources": {
       "../installer/resources/": "installer/"
     },
@@ -68,7 +68,8 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "UPDATER_PUBKEY_PLACEHOLDER",
+      "pubkey": "",
+      "requireSignedVersion": true,
       "endpoints": [
         "https://github.com/singerbj/tunedup/releases/latest/download/latest.json"
       ],
