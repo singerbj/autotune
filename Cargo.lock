@@ -5373,7 +5373,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tunedup"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "assert_no_alloc",
  "serde",
@@ -5402,7 +5402,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-audio"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "cpal",
  "rtrb",
@@ -5415,7 +5415,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-cli"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "clap",
  "hound",
@@ -5425,7 +5425,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-dsp"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "assert_no_alloc",
  "criterion",
@@ -5437,7 +5437,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-engine"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "assert_no_alloc",
  "realfft",
@@ -5452,7 +5452,7 @@ dependencies = [
 
 [[package]]
 name = "tuner-win"
-version = "0.0.3"
+version = "0.0.4"
 dependencies = [
  "serde",
  "serde_json",
