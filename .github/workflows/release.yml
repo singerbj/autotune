@@ -62,7 +62,6 @@ jobs:
             echo "::error::Run this on the release tag $tag (the version in the manifest), not $GITHUB_REF_TYPE $GITHUB_REF_NAME."
             exit 1
           fi
-          git fetch --no-tags origin "$DEFAULT_BRANCH"
           if ! git merge-base --is-ancestor "$GITHUB_SHA" "origin/$DEFAULT_BRANCH"; then
             echo "::error::$tag ($GITHUB_SHA) is not on $DEFAULT_BRANCH: only reviewed commits are released."
             exit 1
