@@ -358,7 +358,10 @@ pub fn run() -> i32 {
                 })
                 .build(),
         )
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(match updater::public_key() {
+            Some(key) => tauri_plugin_updater::Builder::new().pubkey(key).build(),
+            None => tauri_plugin_updater::Builder::new().build(),
+        })
         .plugin(tauri_plugin_process::init())
         .manage(app_state)
         .invoke_handler(builder.invoke_handler())

@@ -1,9 +1,14 @@
 //! Auto-update from GitHub Releases (FR-22) via `tauri-plugin-updater`.
 //!
-//! The release workflow publishes a signed `latest.json`; the app checks it
-//! shortly after launch and every few hours, downloads new versions in the
-//! background (signature verified by the plugin), and installs on the user's
+//! The release workflow publishes a signed `latest.json`; the app checks it a
+//! minute after launch and every 6 hours (30 minutes after a failed check),
+//! downloads new versions in the background, and installs on the user's
 //! command or when they quit. Installing restores audio defaults first.
+//!
+//! The plugin checks the minisign signature against the public key baked in
+//! at build time (`TUNEDUP_UPDATE_PUBKEY`, set by the release workflow) and,
+//! with `requireSignedVersion`, that the signature names the version the feed
+//! offered. Builds without the key (dev builds, forks) never update.
 
 use std::time::Duration;
 
@@ -17,8 +22,18 @@ use crate::error::{AppError, AppResult, ErrorKind};
 use crate::events::UpdateEvent;
 use crate::state::{lock, state};
 
-const FIRST_CHECK_DELAY: Duration = Duration::from_secs(20);
+const FIRST_CHECK_DELAY: Duration = Duration::from_secs(60);
 const CHECK_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
+/// Next try after a failed check (offline at boot, GitHub down).
+const RETRY_INTERVAL: Duration = Duration::from_secs(30 * 60);
+
+/// Minisign public key of the release signing key, baked in by the release build.
+const BUILD_PUBLIC_KEY: Option<&str> = option_env!("TUNEDUP_UPDATE_PUBKEY");
+
+/// The key updates are verified with; `None` in builds that can't update.
+pub fn public_key() -> Option<&'static str> {
+    BUILD_PUBLIC_KEY.map(str::trim).filter(|k| !k.is_empty())
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Type, PartialEq, Default)]
 #[serde(tag = "state", rename_all = "camelCase")]
@@ -57,6 +72,13 @@ fn publish(app: &AppHandle, s: UpdateStatus) {
 pub async fn check_and_download(app: &AppHandle) -> AppResult<UpdateStatus> {
     if matches!(lock(&state(app).updater).status, UpdateStatus::Ready { .. }) {
         return Ok(lock(&state(app).updater).status.clone());
+    }
+    if public_key().is_none() {
+        let status = UpdateStatus::Error {
+            message: "This build can't update itself. Download new versions from GitHub.".into(),
+        };
+        publish(app, status.clone());
+        return Ok(status);
     }
     publish(app, UpdateStatus::Checking);
     let result = async {
@@ -112,17 +134,30 @@ pub fn install(app: &AppHandle) -> AppResult<()> {
     app.restart();
 }
 
-/// Background loop: first check shortly after launch, then periodically.
+/// Background loop: first check a minute after launch, then periodically.
 pub fn spawn_background_checks(app: AppHandle) {
+    if public_key().is_none() {
+        tracing::info!("updates are off in this build");
+        return;
+    }
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(FIRST_CHECK_DELAY).await;
         loop {
+            let mut next = CHECK_INTERVAL;
             if state(&app).config().auto_update {
-                if let Err(e) = check_and_download(&app).await {
-                    tracing::warn!("update check failed: {e}");
+                match check_and_download(&app).await {
+                    Ok(UpdateStatus::Error { message }) => {
+                        tracing::warn!("update check failed: {message}");
+                        next = RETRY_INTERVAL;
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!("update check failed: {e}");
+                        next = RETRY_INTERVAL;
+                    }
                 }
             }
-            tokio::time::sleep(CHECK_INTERVAL).await;
+            tokio::time::sleep(next).await;
         }
     });
 }

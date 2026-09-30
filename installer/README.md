@@ -50,7 +50,7 @@ Set the environment variable `TUNEDUP_SKIP_VBCABLE=1` to skip step 2
 Silent install/uninstall:
 
 ```powershell
-.\TunedUp_x.y.z_x64-setup.exe /S
+.\tunedup-setup.exe /S
 & "C:\Program Files\TunedUp\uninstall.exe" /S
 ```
 
