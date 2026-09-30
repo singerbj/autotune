@@ -122,7 +122,8 @@ Set the repository variable `BUNDLE_VBCABLE=true` once VB-Audio's bundle license
 
 ## Moving from the old settings
 
-The updater key is the same; only the names changed. Store the same values under the new names
+The updater key is the same; only the names changed. Until you move them, releases still read
+the old names and warn. Store the same values under the new names
 (`setup-secrets.ts --key ~/.tauri/tunedup.key` does it), then delete the old ones:
 
 | Old | New |

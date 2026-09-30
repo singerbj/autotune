@@ -15,6 +15,8 @@ name: Release
 #   variable                    UPDATE_PUBKEY                updater public key, baked into the app
 #   secret (release env)        UPDATE_SIGNING_KEY           updater secret key
 #   secret (release env)        UPDATE_SIGNING_KEY_PASSWORD  its password, if it has one
+#   (the old names TAURI_UPDATER_PUBKEY, TAURI_SIGNING_PRIVATE_KEY and
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD still work, with a warning)
 #   optional, Authenticode (codesign env): WINDOWS_CERTIFICATE + WINDOWS_CERTIFICATE_PASSWORD
 #   optional variable           BUNDLE_VBCABLE               `true` once VB-Audio's bundle license is in place
 
@@ -81,7 +83,7 @@ jobs:
       run:
         shell: bash
     env:
-      UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY }}
+      UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY || vars.TAURI_UPDATER_PUBKEY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -201,10 +203,15 @@ jobs:
           path: dist
       - name: Sign for the updater
         env:
-          UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY }}
-          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
-          UPDATE_SIGNING_KEY_PASSWORD: ${{ secrets.UPDATE_SIGNING_KEY_PASSWORD }}
+          UPDATE_PUBKEY: ${{ vars.UPDATE_PUBKEY || vars.TAURI_UPDATER_PUBKEY }}
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY || secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          UPDATE_SIGNING_KEY_PASSWORD: ${{ secrets.UPDATE_SIGNING_KEY_PASSWORD || secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Until the settings move to the shared names (docs/RELEASING.md), the old ones still work.
+          LEGACY_NAMES: ${{ (vars.UPDATE_PUBKEY == '' && vars.TAURI_UPDATER_PUBKEY != '') || (secrets.UPDATE_SIGNING_KEY == '' && secrets.TAURI_SIGNING_PRIVATE_KEY != '') }}
         run: |
+          if [ "$LEGACY_NAMES" = true ]; then
+            echo "::warning::Using the old settings names (TAURI_UPDATER_PUBKEY, TAURI_SIGNING_PRIVATE_KEY). Store them as UPDATE_PUBKEY, UPDATE_SIGNING_KEY and UPDATE_SIGNING_KEY_PASSWORD (docs/RELEASING.md)."
+          fi
           if [ -z "$UPDATE_PUBKEY" ] || [ -z "$UPDATE_SIGNING_KEY" ]; then
             echo "::error::Set the UPDATE_PUBKEY variable and the UPDATE_SIGNING_KEY secret (on the release environment); see docs/RELEASING.md."
             exit 1

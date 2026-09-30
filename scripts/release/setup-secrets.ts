@@ -88,6 +88,8 @@ const environments: [string, { type: "branch" | "tag"; name: string }][] = [
   ["codesign", { type: "tag", name: `${config.tagPrefix}*` }],
   ["release", { type: "tag", name: `${config.tagPrefix}*` }],
 ];
+// Private repositories on GitHub Free have no environments: then the secrets go on the repository.
+let environmentsWork = true;
 for (const [env, policy] of environments) {
   const body = (reviewers: boolean) =>
     JSON.stringify({
@@ -95,10 +97,15 @@ for (const [env, policy] of environments) {
       ...(reviewers && env !== "codesign" ? { reviewers: [{ type: "User", id: Number(me) }] } : {}),
     });
   try {
-    gh(["api", "-X", "PUT", `repos/${repo}/environments/${env}`, "--input", "-"], body(true));
+    try {
+      gh(["api", "-X", "PUT", `repos/${repo}/environments/${env}`, "--input", "-"], body(true));
+    } catch {
+      console.warn(`::warning:: couldn't add you as ${env}'s required reviewer (your plan may not allow it)`);
+      gh(["api", "-X", "PUT", `repos/${repo}/environments/${env}`, "--input", "-"], body(false));
+    }
   } catch {
-    console.warn(`::warning:: couldn't add you as ${env}'s required reviewer (your plan may not allow it)`);
-    gh(["api", "-X", "PUT", `repos/${repo}/environments/${env}`, "--input", "-"], body(false));
+    environmentsWork = false;
+    break;
   }
   try {
     gh(
@@ -109,16 +116,20 @@ for (const [env, policy] of environments) {
     // Already there.
   }
 }
+if (!environmentsWork) {
+  console.warn("::warning:: this repository can't have environments (GitHub Free, private): using repository secrets");
+}
 
+const where = environmentsWork ? ["--env", "release"] : [];
 gh(["variable", "set", "UPDATE_PUBKEY", "--repo", repo, "--body", publicKey]);
-gh(["secret", "set", "UPDATE_SIGNING_KEY", "--repo", repo, "--env", "release"], secretKey);
-gh(["secret", "set", "UPDATE_SIGNING_KEY_PASSWORD", "--repo", repo, "--env", "release"], pass);
+gh(["secret", "set", "UPDATE_SIGNING_KEY", "--repo", repo, ...where], secretKey);
+gh(["secret", "set", "UPDATE_SIGNING_KEY_PASSWORD", "--repo", repo, ...where], pass);
 
 console.log(`
 Done. In ${repo}:
-  variable                     UPDATE_PUBKEY
-  secrets (release environment) UPDATE_SIGNING_KEY, UPDATE_SIGNING_KEY_PASSWORD
-  environments                 release-prep, codesign, release
+  variable  UPDATE_PUBKEY
+  secrets   UPDATE_SIGNING_KEY, UPDATE_SIGNING_KEY_PASSWORD (${environmentsWork ? "on the release environment" : "repository secrets"})
+  ${environmentsWork ? "environments release-prep, codesign, release" : "no environments (not available on this plan)"}
 
 BACK UP ${keyFile} and its password (a password manager is fine). If they are lost, installed
 copies of ${config.productName} can never update themselves again.`);
