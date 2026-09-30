@@ -76,10 +76,19 @@ jobs:
         env:
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
+          # Re-running a release whose build failed: the tag is already pushed,
+          # so skip the bump and let the build job use the existing tag.
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::notice::Tag v$VERSION already exists; rebuilding it without a version bump."
+            exit 0
+          fi
           ./scripts/set-version.sh "$VERSION"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "chore(release): v$VERSION"
+          # The version may already be set on the branch (e.g. bumped by hand).
+          if ! git diff --quiet; then
+            git commit -am "chore(release): v$VERSION"
+          fi
           git tag -a "v$VERSION" -m "v$VERSION"
           git push origin HEAD "v$VERSION"
       - name: Tag matches Cargo.toml (tag pushes)
