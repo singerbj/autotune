@@ -34,10 +34,23 @@ export const commands = {
 	getHotkeyStatus: () => __TAURI_INVOKE<HotkeyStatus>("get_hotkey_status"),
 	/**  Acoustic loopback test (FR-16). */
 	runLatencyTest: () => typedError<LatencyResult, AppError>(__TAURI_INVOKE("run_latency_test")),
-	/**  VB-Cable, conflicts, Discord session, sidetone and Bluetooth (FR-12, FR-13). */
+	/**
+	 *  VB-Cable, conflicts, Discord session, sidetone and Bluetooth (FR-12, FR-13),
+	 *  and whether Windows plays into the cable (ADR 0011).
+	 */
 	runSetupCheck: () => typedError<SetupReport, AppError>(__TAURI_INVOKE("run_setup_check")),
 	/**  "Use for all apps" (FR-14). */
 	setRouteAllApps: (enabled: boolean) => typedError<boolean, AppError>(__TAURI_INVOKE("set_route_all_apps", { enabled })),
+	/**
+	 *  Turn a disabled cable back on, or install / restart VB-Cable with one UAC
+	 *  prompt (ADR 0011).
+	 */
+	repairVirtualMic: () => typedError<RepairOutcome, AppError>(__TAURI_INVOKE("repair_virtual_mic")),
+	/**
+	 *  Windows plays into CABLE Input: move the default speakers back to a real
+	 *  device (ADR 0011).
+	 */
+	fixPlaybackDevice: () => typedError<null, AppError>(__TAURI_INVOKE("fix_playback_device")),
 	openAsioPanel: () => typedError<null, AppError>(__TAURI_INVOKE("open_asio_panel")),
 	/**  Diagnostics panel (FR-18). */
 	getDiagnostics: () => __TAURI_INVOKE<Diagnostics>("get_diagnostics").then((v) => (({...v,engine:v.engine==null?v.engine:v.engine,meters:v.meters==null?v.meters:v.meters,measuredLatencyMs:v.measuredLatencyMs==null?v.measuredLatencyMs:v.measuredLatencyMs}) as typeof v)),
@@ -224,6 +237,8 @@ export type HotkeyStatus = {
 
 /**  A VB-Cable endpoint that exists but Windows won't let apps open. */
 export type InactiveCable = {
+	/**  Endpoint ID, used to turn a disabled cable back on. */
+	id: string,
 	name: string,
 	isCapture: boolean,
 	/**  Turned off in Sound settings (otherwise reported unplugged). */
@@ -280,6 +295,13 @@ export type Preset = {
 	params: TuningParams,
 };
 
+/**  What `repair_virtual_mic` achieved. */
+export type RepairOutcome = 
+/**  Both cable endpoints are active. */
+"fixed" | 
+/**  VB-Cable was installed or repaired but Windows needs a restart. */
+"restartRequired";
+
 /**  Saved defaults, stored in the app config. */
 export type RoutingBackup = {
 	console: string | null,
@@ -315,6 +337,16 @@ export type SetupReport = {
 	sidetoneWarning: boolean,
 	/**  Running over Remote Desktop, where the PC's audio devices are hidden. */
 	remoteSession: boolean,
+	/**
+	 *  Windows plays sound into CABLE Input by default, so the user hears
+	 *  nothing from other apps (ADR 0011).
+	 */
+	playbackOnCable: boolean,
+	/**
+	 *  `repair_virtual_mic` can install or restart VB-Cable (the installer's
+	 *  helper script is present).
+	 */
+	cableRepairAvailable: boolean,
 };
 
 /**  What a running stream actually negotiated. */

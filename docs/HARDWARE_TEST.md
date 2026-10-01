@@ -14,8 +14,11 @@ report attached.
 ## 1. Install (FR-15, NFR-09)
 
 - [ ] Start a timer. Run the installer; exactly one UAC prompt.
-- [ ] If VB-Cable was missing: one reboot is offered; after it the app opens
-      in the setup wizard.
+- [ ] If VB-Cable was missing: usually no reboot is offered and the cable
+      works right away. If one is offered, after it the app opens in the
+      setup wizard.
+- [ ] Sound settings: the default speakers and mic are what they were
+      before the install (not CABLE Input / CABLE Output).
 - [ ] Wizard shows VB-Cable installed and no conflicts (or the expected ones).
 - [ ] Stop the timer when Discord hears you tuned (step 4). Target < 5 min.
 
@@ -59,7 +62,19 @@ Headset: ______________________ (wired USB, ~3 ms periods)
 - [ ] Unplug the headset while running: the app recovers on another device
       within 2 s; replug: it switches back within 2 s.
 
-## 7. Uninstall
+## 7. Repair (ADR 0011)
 
-- [ ] Uninstall from Settings → Apps: default mic restored, app and
-      shortcuts gone, prompt to remove VB-Cable (only if we installed it).
+- [ ] Sound settings → disable CABLE Output: the Audio tab shows "Turn
+      VB-Cable back on"; it works without a UAC prompt.
+- [ ] Set CABLE Input as the default speakers: the Audio tab warns; "Switch
+      back to my speakers" restores the previous speakers.
+- [ ] Remove VB-Cable with its own setup (`-u`), no reboot: "Install
+      VB-Cable" reinstalls it with one UAC prompt.
+
+## 8. Uninstall
+
+- [ ] With Discord on CABLE Output and *Use for all apps* on, uninstall from
+      Settings → Apps: default mic restored, the VB-Cable prompt (only if we
+      installed it) names Discord.
+- [ ] Answer Yes: afterwards the default speakers and mic are real devices,
+      usually with no reboot asked for. App and shortcuts gone.

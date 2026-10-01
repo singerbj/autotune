@@ -81,6 +81,11 @@ impl From<WinError> for AppError {
                 "Windows did not allow changing the default microphone. Set \"CABLE Output\" as the \
                  default recording device in Sound settings instead.",
             ),
+            WinError::Cancelled => Self::new(
+                ErrorKind::Device,
+                "Windows needs administrator permission to install or restart VB-Cable. Try \
+                 again and choose Yes.",
+            ),
             other => Self::new(ErrorKind::Internal, other.to_string()),
         }
     }

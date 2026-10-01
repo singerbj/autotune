@@ -3,6 +3,7 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod cable;
 pub mod commands;
 pub mod config;
 pub mod diagnostics;
@@ -47,6 +48,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::run_latency_test,
             commands::run_setup_check,
             commands::set_route_all_apps,
+            commands::repair_virtual_mic,
+            commands::fix_playback_device,
             commands::open_asio_panel,
             commands::get_diagnostics,
             commands::complete_wizard,
@@ -269,6 +272,7 @@ fn spawn_control_loop(app: AppHandle) {
                 }
                 if devices_changed {
                     if let Ok(d) = s.devices() {
+                        cable::on_devices_changed(&s, &d);
                         let _ = DevicesChangedEvent(d).emit(&app);
                     }
                 }
@@ -301,6 +305,9 @@ pub fn run() -> i32 {
     if args.iter().any(|a| a == "--restore-defaults") {
         return restore_defaults_headless();
     }
+    if args.iter().any(|a| a == "--cable") {
+        return cable::run_cli(&args);
+    }
     let minimized = args.iter().any(|a| a == "--minimized");
     let first_run = args.iter().any(|a| a == "--first-run");
 
@@ -321,6 +328,11 @@ pub fn run() -> i32 {
         Ok(true) => tracing::info!("restored default recording devices left by a previous session"),
         Ok(false) => {}
         Err(e) => tracing::warn!("could not restore default devices: {e}"),
+    }
+    // ADR 0011: a VB-Cable install (often finished by a reboot) may have made
+    // the cable the default speakers or mic.
+    if let Ok(devices) = app_state.devices() {
+        cable::settle_install(&app_state, &devices);
     }
 
     let app = tauri::Builder::default()

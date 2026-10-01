@@ -31,7 +31,13 @@ export function useBackendEvents(): void {
     keep(events.metersEvent.listen((e) => meterStore.set(e.payload)));
     keep(events.bypassEvent.listen((e) => setBypassCache(qc, e.payload)));
     keep(events.updateEvent.listen((e) => qc.setQueryData(queryKeys.updateStatus, e.payload)));
-    keep(events.devicesChangedEvent.listen((e) => qc.setQueryData(queryKeys.devices, e.payload)));
+    keep(
+      events.devicesChangedEvent.listen((e) => {
+        qc.setQueryData(queryKeys.devices, e.payload);
+        // VB-Cable appearing or Windows' defaults changing alter the setup check.
+        void qc.invalidateQueries({ queryKey: queryKeys.setupCheck });
+      }),
+    );
     keep(events.errorEvent.listen((e) => toastError("TunedUp", e.payload)));
 
     return () => {

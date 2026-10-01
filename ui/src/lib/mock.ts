@@ -52,6 +52,8 @@ export interface MockBackend {
   reset: () => void;
   /** Replace the device list and fire `devicesChangedEvent`. */
   setDevices: (devices: DeviceInfo[]) => void;
+  /** Make Windows "play into CABLE Input" (ADR 0011). */
+  setPlaybackOnCable: (on: boolean) => void;
 }
 
 // Delays are real in the browser demo and zero under Vitest.
@@ -234,6 +236,7 @@ interface MockState {
   update: UpdateStatus;
   hotkey: HotkeyStatus;
   setupChecks: number;
+  playbackOnCable: boolean;
   counters: {
     xruns: number;
     captureDiscontinuities: number;
@@ -252,6 +255,7 @@ function initialState(): MockState {
     update: { state: "idle" },
     hotkey: { active: "CommandOrControl+Alt+B", problem: null },
     setupChecks: 0,
+    playbackOnCable: false,
     counters: {
       xruns: 0,
       captureDiscontinuities: 0,
@@ -423,6 +427,8 @@ export function createMockBackend(): MockBackend {
         (selectedMic()?.isBluetooth ?? false) || (selectedHeadphones()?.isBluetooth ?? false),
       sidetoneWarning: false,
       remoteSession: false,
+      playbackOnCable: state.playbackOnCable,
+      cableRepairAvailable: true,
     };
   };
 
@@ -629,6 +635,23 @@ export function createMockBackend(): MockBackend {
       return ok(enabled);
     },
 
+    repairVirtualMic: async () => {
+      await delay(600);
+      const cables = DEVICES.filter((d) => d.isVbCable);
+      const missing = cables.filter((c) => !state.devices.some((d) => d.id === c.id));
+      if (missing.length > 0) {
+        state.devices = [...state.devices, ...missing.map((d) => ({ ...d }))];
+        void devicesChangedEvent.emit(state.devices.map((d) => ({ ...d })));
+      }
+      return ok("fixed" as const);
+    },
+
+    fixPlaybackDevice: async () => {
+      await delay(100);
+      state.playbackOnCable = false;
+      return ok(null);
+    },
+
     openAsioPanel: () => {
       const mic = selectedMic();
       return Promise.resolve(
@@ -756,6 +779,9 @@ export function createMockBackend(): MockBackend {
     setDevices: (devices) => {
       state.devices = devices.map((d) => ({ ...d }));
       void devicesChangedEvent.emit(state.devices.map((d) => ({ ...d })));
+    },
+    setPlaybackOnCable: (on) => {
+      state.playbackOnCable = on;
     },
   };
 }

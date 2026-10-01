@@ -8,7 +8,9 @@ use tauri_plugin_autostart::ManagerExt;
 use tuner_audio::DeviceInfo;
 use tuner_dsp::{Scale, TuningParams, VoiceRange};
 use tuner_engine::LatencyResult;
-use tuner_win::{EndpointSummary, InactiveCable, SetupInputs, SetupReport};
+use tuner_win::{DefaultsSnapshot, InactiveCable, SetupInputs, SetupReport};
+
+use crate::cable::{self, RepairOutcome};
 
 use crate::config::{AppConfig, ConfigPatch, Preset};
 use crate::diagnostics::{report, Diagnostics};
@@ -228,23 +230,15 @@ pub async fn run_latency_test(app: AppHandle) -> AppResult<LatencyResult> {
     Ok(r)
 }
 
-/// VB-Cable, conflicts, Discord session, sidetone and Bluetooth (FR-12, FR-13).
+/// VB-Cable, conflicts, Discord session, sidetone and Bluetooth (FR-12, FR-13),
+/// and whether Windows plays into the cable (ADR 0011).
 #[tauri::command]
 #[specta::specta]
 pub fn run_setup_check(app: AppHandle) -> AppResult<SetupReport> {
     let s = state(&app);
     let devices = s.devices()?;
     let cfg = s.config();
-    let endpoints: Vec<EndpointSummary> = devices
-        .iter()
-        .map(|d| EndpointSummary {
-            id: d.id.clone(),
-            name: d.name.clone(),
-            is_capture: d.direction == tuner_audio::Direction::Capture,
-            is_bluetooth: d.is_bluetooth,
-            is_vb_cable: d.is_vb_cable,
-        })
-        .collect();
+    let endpoints = cable::summaries(&devices);
     let default_of = |dir| {
         devices
             .iter()
@@ -272,6 +266,7 @@ pub fn run_setup_check(app: AppHandle) -> AppResult<SetupReport> {
         .unwrap_or_default()
         .into_iter()
         .map(|e| InactiveCable {
+            id: e.id,
             name: e.name,
             is_capture: e.direction == tuner_audio::Direction::Capture,
             disabled: e.disabled,
@@ -279,6 +274,7 @@ pub fn run_setup_check(app: AppHandle) -> AppResult<SetupReport> {
         .collect();
     let cin = sessions(DeviceInfo::is_cable_input);
     let cout = sessions(DeviceInfo::is_cable_output);
+    let defaults = DefaultsSnapshot::read(s.endpoint_control.as_ref()).ok();
     Ok(tuner_win::evaluate_setup(&SetupInputs {
         endpoints: &endpoints,
         inactive_cables: &inactive,
@@ -289,7 +285,46 @@ pub fn run_setup_check(app: AppHandle) -> AppResult<SetupReport> {
         own_pid: std::process::id(),
         listen_enabled: mic.as_deref().and_then(tuner_win::listen_to_device_enabled),
         remote_session: tuner_win::is_remote_session(),
+        defaults: defaults.as_ref(),
+        cable_repair_available: cable::helper_script().is_some(),
     }))
+}
+
+/// Turn a disabled cable back on, or install / restart VB-Cable with one UAC
+/// prompt (ADR 0011).
+#[tauri::command]
+#[specta::specta]
+pub async fn repair_virtual_mic(app: AppHandle) -> AppResult<RepairOutcome> {
+    let handle = app.clone();
+    let outcome = tauri::async_runtime::spawn_blocking(move || cable::repair(&state(&handle)))
+        .await
+        .map_err(|e| AppError::new(ErrorKind::Internal, e.to_string()))??;
+    let s = state(&app);
+    s.devices_dirty
+        .store(true, std::sync::atomic::Ordering::Release);
+    Ok(outcome)
+}
+
+/// Windows plays into CABLE Input: move the default speakers back to a real
+/// device (ADR 0011).
+#[tauri::command]
+#[specta::specta]
+pub fn fix_playback_device(app: AppHandle) -> AppResult<()> {
+    let s = state(&app);
+    let endpoints = cable::summaries(&s.devices()?);
+    let control = s.endpoint_control.as_ref();
+    if !tuner_win::cable::playback_on_cable(&DefaultsSnapshot::read(control)?, &endpoints) {
+        return Ok(());
+    }
+    let moved = cable::release(control, &endpoints, &[tuner_win::Flow::Render])?;
+    if moved == 0 {
+        return Err(AppError::new(
+            ErrorKind::Device,
+            "No speakers or headphones to switch to. Plug one in, then choose it in Sound \
+             settings.",
+        ));
+    }
+    Ok(())
 }
 
 /// "Use for all apps" (FR-14).

@@ -19,7 +19,7 @@ checks run in CI; hardware checks are part of the per-release manual matrix.
 | FR-12 | setup wizard, `run_setup_check`, `tuner-win::setup` | `setup::tests::fr12_*`, UI wizard tests |
 | FR-13 | Discord session detection | `setup::tests::fr13_*`, manual |
 | FR-14 | `RouteAllApps` + `IPolicyConfig` | `routing::tests::fr14_*`, manual |
-| FR-15 | `installer/` hooks + `install-vbcable.ps1` | Pester tests, installer smoke test, manual clean VM |
+| FR-15 | `installer/` hooks + `install-vbcable.ps1`, `tuner-win::cable`, `src-tauri::cable` (`--cable` helpers, `repair_virtual_mic`, `fix_playback_device`) | Pester tests, `cable::tests::fr15_*`, UI `CableHealth` tests, installer smoke test, manual clean VM |
 | FR-16 | estimate in `EngineStatus`; loopback test | `latency::tests::fr16_*`, `engine_mock::fr16_*`, manual |
 | FR-17 | `DspMeters`, `meters-event`, canvas meter | `engine_mock::fr02_fr03_fr04_*`, UI tests |
 | FR-18 | `CallbackStats`, diagnostics panel/report | `stats::tests::fr18_*`, `diagnostics::tests::fr18_*` |
