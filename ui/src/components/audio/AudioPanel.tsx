@@ -16,12 +16,14 @@ import {
   useEngineStatus,
   useRouteAllApps,
   useSetConfig,
+  useSetupCheck,
 } from "@/lib/queries";
 import { unwrap } from "@/lib/result";
 
+import { CableHealth } from "./CableHealth";
 import { DeviceSelection } from "./DeviceSelection";
 
-/** Audio tab (FR-01, FR-03, FR-04, FR-14). */
+/** Audio tab (FR-01, FR-03, FR-04, FR-14, ADR 0012). */
 export function AudioPanel() {
   const config = useConfig();
   const devices = useDevices();
@@ -29,6 +31,7 @@ export function AudioPanel() {
   const appInfo = useAppInfo();
   const setConfig = useSetConfig();
   const routeAll = useRouteAllApps();
+  const check = useSetupCheck();
   const asioPanel = useMutation({
     mutationFn: () => unwrap(commands.openAsioPanel()),
     meta: { errorTitle: "Couldn't open the ASIO control panel" },
@@ -126,6 +129,13 @@ export function AudioPanel() {
             <TriangleAlertIcon aria-hidden />
             <span>{cableError}</span>
           </Alert>
+        )}
+        {check.data && (
+          <CableHealth
+            report={check.data}
+            rechecking={check.isFetching}
+            onRecheck={() => void check.refetch()}
+          />
         )}
       </Card>
 

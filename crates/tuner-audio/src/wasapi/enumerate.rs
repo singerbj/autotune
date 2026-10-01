@@ -156,9 +156,11 @@ pub(crate) fn inactive_vb_cable_endpoints() -> Result<Vec<InactiveEndpoint>, Aud
             if !is_vb_cable(store.as_ref(), &name) {
                 continue;
             }
+            let Ok(id) = device_id(&dev) else { continue };
             // SAFETY: valid endpoint.
             let state = unsafe { dev.GetState() }.unwrap_or(DEVICE_STATE_DISABLED);
             out.push(InactiveEndpoint {
+                id,
                 name,
                 direction: dir,
                 disabled: state == DEVICE_STATE_DISABLED,

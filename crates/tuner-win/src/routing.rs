@@ -12,20 +12,54 @@ use serde::{Deserialize, Serialize};
 
 use crate::WinError;
 
-/// Windows default-device roles we manage (console and communications).
+/// Windows default-device roles (`ERole`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Role {
     Console,
+    Multimedia,
     Communications,
 }
 
+/// The roles "Use for all apps" changes (console and communications).
 pub const ROLES: [Role; 2] = [Role::Console, Role::Communications];
 
-/// Reads and writes the default *recording* endpoint per role.
+/// Every role, for guarding the defaults around VB-Cable installs.
+pub const ALL_ROLES: [Role; 3] = [Role::Console, Role::Multimedia, Role::Communications];
+
+/// Playback (render) or recording (capture) side of the audio system.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Flow {
+    Render,
+    Capture,
+}
+
+/// Reads and writes the default endpoints per role.
 pub trait DefaultEndpointControl: Send + Sync {
     fn get_default_capture(&self, role: Role) -> Result<Option<String>, WinError>;
+    /// Make `id` the default for `role`; the endpoint's own flow decides
+    /// whether that's the default microphone or the default speakers.
     fn set_default_capture(&self, id: &str, role: Role) -> Result<(), WinError>;
+
+    /// The default endpoint of either flow.
+    fn get_default(&self, flow: Flow, role: Role) -> Result<Option<String>, WinError> {
+        match flow {
+            Flow::Capture => self.get_default_capture(role),
+            Flow::Render => Err(WinError::Unsupported("reading the default playback device")),
+        }
+    }
+
+    /// Make `id` (of either flow) the default for `role`.
+    fn set_default(&self, id: &str, role: Role) -> Result<(), WinError> {
+        self.set_default_capture(id, role)
+    }
+
+    /// Turn an endpoint on or off, as Sound settings' Enable/Disable does.
+    fn set_endpoint_enabled(&self, id: &str, enabled: bool) -> Result<(), WinError> {
+        let _ = (id, enabled);
+        Err(WinError::Unsupported("enabling audio devices"))
+    }
 }
 
 /// Fallback when `IPolicyConfig` is unavailable.

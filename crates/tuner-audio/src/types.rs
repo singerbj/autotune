@@ -94,6 +94,8 @@ pub fn is_vb_cable_name(name: &str) -> bool {
 /// off in Sound settings, or reported unplugged.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InactiveEndpoint {
+    /// Endpoint ID, used to turn it back on.
+    pub id: String,
     pub name: String,
     pub direction: Direction,
     /// Disabled by the user (otherwise unplugged).

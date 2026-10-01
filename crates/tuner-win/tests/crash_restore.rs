@@ -27,6 +27,7 @@ impl FileOsDefaults {
 fn key(r: Role) -> &'static str {
     match r {
         Role::Console => "console",
+        Role::Multimedia => "multimedia",
         Role::Communications => "communications",
     }
 }

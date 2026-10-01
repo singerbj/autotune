@@ -5,6 +5,8 @@
 //!   undocumented `IPolicyConfig` lives only here, behind the
 //!   [`DefaultEndpointControl`] trait, and every failure has a fallback (the
 //!   wizard's manual instructions).
+//! * [`cable`] — keeps Windows' default devices off VB-Cable around installs
+//!   and removals (ADR 0012).
 //! * [`setup`] — pure evaluation of the setup check (FR-12, FR-13): VB-Cable
 //!   presence, cable conflicts, Discord session, Bluetooth/sidetone warnings.
 //! * Windows-only: device change notifications, audio session enumeration,
@@ -13,16 +15,20 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
+pub mod cable;
 pub mod routing;
 pub mod setup;
 
 #[cfg(windows)]
 mod win;
 
-pub use routing::{DefaultEndpointControl, Role, RouteAllApps, RoutingBackup, RoutingStore};
+pub use cable::{DefaultEntry, DefaultsSnapshot};
+pub use routing::{
+    DefaultEndpointControl, Flow, Role, RouteAllApps, RoutingBackup, RoutingStore, ALL_ROLES,
+};
 pub use setup::{
-    evaluate_setup, is_discord_process, AudioSession, EndpointSummary, InactiveCable, SessionState,
-    SetupInputs, SetupReport,
+    evaluate_setup, is_discord_process, session_apps, AudioSession, EndpointSummary, InactiveCable,
+    SessionState, SetupInputs, SetupReport,
 };
 
 /// Errors from Windows integration.
@@ -36,6 +42,8 @@ pub enum WinError {
     Store(String),
     #[error("device not found: {0}")]
     NotFound(String),
+    #[error("the administrator permission prompt was declined")]
+    Cancelled,
 }
 
 /// Device change notification (FR-05 input to the supervisor).
@@ -139,6 +147,20 @@ pub fn other_signed_in_user() -> Option<SignedInUser> {
     #[cfg(not(windows))]
     {
         None
+    }
+}
+
+/// Run `program args` as administrator (one UAC prompt), wait for it and
+/// return its exit code. A declined prompt is [`WinError::Cancelled`].
+pub fn run_elevated(program: &std::path::Path, args: &str) -> Result<u32, WinError> {
+    #[cfg(windows)]
+    {
+        win::elevate::run_elevated(program, args)
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (program, args);
+        Err(WinError::Unsupported("running as administrator"))
     }
 }
 

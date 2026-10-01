@@ -10,11 +10,11 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { CableHealth } from "@/components/audio/CableHealth";
 import { DeviceSelection } from "@/components/audio/DeviceSelection";
 import { LatencyTest } from "@/components/diagnostics/LatencyTest";
 import { SettingRow } from "@/components/SettingRow";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import {
   useConfig,
@@ -81,65 +81,17 @@ export function CableStep() {
 
   return (
     <div className="flex flex-col gap-4">
-      {report.vbCableInstalled ? (
+      {report.vbCableInstalled && (
         <Alert variant="success">
           <CircleCheckIcon aria-hidden />
           <span>VB-Cable is installed. Other apps can use the tuned voice.</span>
         </Alert>
-      ) : (
-        <Alert variant="warning">
-          <CircleXIcon aria-hidden />
-          <div className="flex flex-col gap-2">
-            {report.remoteSession ? (
-              <>
-                <span className="font-medium">You're connected over Remote Desktop.</span>
-                <span>
-                  Windows hides this PC's own audio devices in a Remote Desktop session, including
-                  VB-Cable, so TunedUp can't see them. Run TunedUp at the PC itself, or in Remote
-                  Desktop Connection choose Show Options → Local Resources → Remote audio → Settings
-                  → <strong>Play on remote computer</strong> and reconnect.
-                </span>
-              </>
-            ) : report.inactiveCables.length > 0 ? (
-              <>
-                <span className="font-medium">VB-Cable is installed, but Windows has it off.</span>
-                <ul className="list-disc pl-5">
-                  {report.inactiveCables.map((c) => (
-                    <li key={`${c.isCapture ? "rec" : "play"}:${c.name}`}>
-                      <strong>{c.name}</strong>{" "}
-                      {c.disabled ? "is disabled" : "is reported unplugged"} under{" "}
-                      {c.isCapture ? "Recording" : "Playback"} devices.
-                    </li>
-                  ))}
-                </ul>
-                <span>
-                  Press Win+R, run <strong>mmsys.cpl</strong>, open that tab, right-click the list
-                  and tick <strong>Show Disabled Devices</strong>, then right-click the cable and
-                  choose <strong>Enable</strong>.
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="font-medium">VB-Cable was not found.</span>
-                <span>
-                  The TunedUp installer normally installs it for you. Re-run the installer (or
-                  install VB-Cable from vb-audio.com); Windows may need a reboot before the cable
-                  appears. You can still use monitoring without it.
-                </span>
-              </>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="self-start"
-              disabled={check.isFetching}
-              onClick={() => void check.refetch()}
-            >
-              Check again
-            </Button>
-          </div>
-        </Alert>
       )}
+      <CableHealth
+        report={report}
+        rechecking={check.isFetching}
+        onRecheck={() => void check.refetch()}
+      />
       {report.cableConflicts.length > 0 && (
         <Alert variant="warning">
           <RadioIcon aria-hidden />

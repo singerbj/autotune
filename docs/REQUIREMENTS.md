@@ -33,7 +33,7 @@ All are required for v1 except FR-21, which is a stretch goal.
 | FR-12 | Setup | First-run wizard: choose mic and headphones, detect VB-Cable and conflicts, warn about sidetone and Bluetooth, walk through the Discord checklist, run a latency test. |
 | FR-13 | Setup | Detect a Discord capture session on CABLE Output and show its status. |
 | FR-14 | Setup | "Use for all apps" sets CABLE Output as the default recording device (console and communications roles) and restores the previous defaults on quit and after a crash. |
-| FR-15 | Setup | The installer silently installs VB-Cable when it's missing, with one UAC prompt and one reboot, then resumes the wizard after reboot. |
+| FR-15 | Setup | The installer silently installs VB-Cable when it's missing, with one UAC prompt and a reboot only when Windows needs one (then resumes the wizard after it), without leaving the cable as the default playback or recording device (ADR 0012). |
 | FR-16 | Diagnostics | Show estimated latency live in the header; a "Measure" button runs an acoustic loopback test and reports ms. |
 | FR-17 | Diagnostics | Meters at 30 Hz: input level, detected pitch, target note, correction in cents. |
 | FR-18 | Diagnostics | Diagnostics panel with backend tier, periods, xruns, and callback p99/max, plus a "Copy diagnostics" button. |

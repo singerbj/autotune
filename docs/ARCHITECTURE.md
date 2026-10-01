@@ -10,7 +10,7 @@ A Windows desktop app, built in Rust with Tauri 2, that pitch-corrects the user'
 
 - Round-trip monitoring latency of 20 ms or less on a wired USB headset using WASAPI, at the Mid voice range, and 15 ms or less on an interface with a native ASIO driver.
 - No audible dropouts in a 1-hour session at default settings.
-- One installer: one UAC prompt, one reboot, no vendor drivers required.
+- One installer: one UAC prompt, a reboot only when Windows needs one, no vendor drivers required.
 - Works with any WASAPI capture and render device the user already has.
 
 **Non-goals (v1)**
@@ -163,6 +163,13 @@ The tuned voice reaches other apps by rendering into VB-Cable's "CABLE Input"; a
 - The previous defaults are saved to config before the change and restored on quit.
 - A dirty flag in config means "restore on next launch", so a crash never leaves the user's mic hijacked.
 - Per-app routing through `IAudioPolicyConfigFactory` is deferred to v2.
+- If the cable disappears while "Use for all apps" is on, the user's own mic is restored at once; it is re-applied when the cable comes back.
+
+**Keeping the cable healthy** ([ADR 0012](decisions/0012-vb-cable-lifecycle.md))
+
+- Windows often makes a new cable the default playback device. The installer saves the defaults before installing VB-Cable and puts back every role that moved onto the cable; the app repeats this at launch and on device changes for 120 s after the cable first appears.
+- The setup check flags "Windows plays into CABLE Input" with a one-click fix (`fix_playback_device`).
+- `repair_virtual_mic` re-enables a disabled cable, or installs / restarts VB-Cable through the installer's script with one UAC prompt.
 
 **Discord**
 
@@ -186,6 +193,8 @@ Rust owns all state; the TypeScript frontend is a thin, typed view over commands
 | `run_latency_test` | Loopback test tone; returns measured round trip in ms |
 | `run_setup_check` | VB-Cable present, cable conflicts, Discord session, sidetone and Bluetooth warnings |
 | `set_route_all_apps` | Toggle the Windows default mic to CABLE Output, with restore |
+| `repair_virtual_mic` | Re-enable, install or restart VB-Cable; reports whether Windows needs a restart |
+| `fix_playback_device` | Move the default speakers off CABLE Input |
 | `open_asio_panel` | Open the active ASIO driver's control panel |
 
 **Events**
@@ -226,17 +235,18 @@ voice-tuner/
 
 ## Installer, licensing, distribution
 
-One signed NSIS installer from the Tauri bundler, with install hooks that set up VB-Cable. The user sees one UAC prompt and one reboot.
+One signed NSIS installer from the Tauri bundler, with install hooks that set up VB-Cable. The user sees one UAC prompt, and a reboot only when the cable doesn't come up without one.
 
 **Install sequence**
 
 1. Install the app per-machine (elevated).
 2. Add VB-Audio's publisher certificate to the `TrustedPublisher` store, so the driver install shows no Windows Security prompt.
-3. Run `VBCABLE_Setup_x64.exe -i -h` silently, unless VB-Cable is already installed.
+3. Save the default audio devices (`tunedup.exe --cable snapshot`), then run `VBCABLE_Setup_x64.exe -i -h` silently, unless VB-Cable is already installed. Fail if the driver isn't there afterwards.
 4. Record in the registry whether the app installed VB-Cable.
-5. Set a first-run flag, then prompt to reboot. After reboot, the app opens straight into the setup wizard.
+5. Wait for the cable endpoints, restarting the Windows Audio services once if they don't appear, and put back any default Windows moved onto the cable (`--cable settle`).
+6. Only if the cable still isn't active: set a first-run flag, then prompt to reboot. After reboot, the app opens straight into the setup wizard.
 
-**Uninstall:** restore any changed default devices, remove the app, and offer to remove VB-Cable (`-u -h`) only if the app installed it.
+**Uninstall:** restore any changed default devices, then, only if the app installed VB-Cable, ask whether to remove it, naming apps still recording from CABLE Output. On Yes, move every default off the cable, remove the app, run `-u -h`, and ask for a reboot only if the endpoints don't go away.
 
 **Elevated as another account:** under Windows 11 Administrator Protection, or when another admin approves the UAC prompt, elevated code runs as a different account. Per-user state (the `RunOnce` entry, autostart, config, logs, the WebView2 profile) then goes to the signed-in user, not the elevated account. See [ADR 0009](decisions/0009-elevated-as-another-account.md).
 
@@ -288,6 +298,7 @@ The biggest risks are dependencies outside our control: undocumented Windows API
 | --- | --- | --- |
 | `IPolicyConfig` breaks in a Windows update | "Use for all apps" stops working | Isolated in `tuner-win`; on failure, fall back to wizard instructions |
 | VB-Audio bundle terms don't work | Can't ship a one-click install | Link-out install for v1; own SYSVAD-based driver in v2 (EV cert + attestation signing) |
+| VB-Cable install/removal disturbs the user's audio (default devices, reboots) | No sound after install, wrong devices after removal | Defaults saved and restored around both, audio services restarted instead of a reboot when that is enough, in-app repair (ADR 0012) |
 | Headset driver only allows 10 ms shared output | Round trip \~27 ms | v2 "pro mode": exclusive headset output, system audio mixed in by the app via a second cable |
 | PSOLA artifacts on big shifts or fast retune | Audible warble | Cap shift range, crossfade on voicing changes, tune on golden files |
 | Another app holds the mic exclusively | Exclusive capture fails | Automatic fallback tier with a visible latency warning |

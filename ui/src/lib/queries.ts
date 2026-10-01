@@ -175,6 +175,32 @@ export function useRouteAllApps() {
   });
 }
 
+/** Refresh what depends on VB-Cable after a repair or default-device change. */
+function invalidateCable(qc: QueryClient): void {
+  void qc.invalidateQueries({ queryKey: queryKeys.setupCheck });
+  void qc.invalidateQueries({ queryKey: queryKeys.devices });
+}
+
+/** Turn a disabled cable back on, or install / restart VB-Cable (ADR 0012). */
+export function useRepairVirtualMic() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(commands.repairVirtualMic()),
+    onSettled: () => invalidateCable(qc),
+    meta: { errorTitle: "Couldn't repair the virtual microphone" },
+  });
+}
+
+/** Move Windows' default speakers off CABLE Input (ADR 0012). */
+export function useFixPlaybackDevice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => unwrap(commands.fixPlaybackDevice()),
+    onSettled: () => invalidateCable(qc),
+    meta: { errorTitle: "Couldn't change the default speakers" },
+  });
+}
+
 export function useLaunchAtLogin() {
   const qc = useQueryClient();
   return useMutation({

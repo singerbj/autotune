@@ -3,6 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::cable::{playback_on_cable, DefaultsSnapshot};
+
 /// Minimal endpoint description needed by the setup check.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -20,6 +22,8 @@ pub struct EndpointSummary {
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "specta", derive(specta::Type))]
 pub struct InactiveCable {
+    /// Endpoint ID, used to turn a disabled cable back on.
+    pub id: String,
     pub name: String,
     pub is_capture: bool,
     /// Turned off in Sound settings (otherwise reported unplugged).
@@ -68,6 +72,12 @@ pub struct SetupReport {
     pub sidetone_warning: bool,
     /// Running over Remote Desktop, where the PC's audio devices are hidden.
     pub remote_session: bool,
+    /// Windows plays sound into CABLE Input by default, so the user hears
+    /// nothing from other apps (ADR 0012).
+    pub playback_on_cable: bool,
+    /// `repair_virtual_mic` can install or restart VB-Cable (the installer's
+    /// helper script is present).
+    pub cable_repair_available: bool,
 }
 
 /// True for Discord's stable, PTB, Canary and development builds.
@@ -87,20 +97,29 @@ pub struct SetupInputs<'a> {
     pub own_pid: u32,
     pub listen_enabled: Option<bool>,
     pub remote_session: bool,
+    /// Current default endpoints; `None` when they couldn't be read.
+    pub defaults: Option<&'a DefaultsSnapshot>,
+    pub cable_repair_available: bool,
+}
+
+/// Apps with a live session on an endpoint, other than TunedUp itself:
+/// sorted, without duplicates.
+pub fn session_apps(sessions: &[AudioSession], own_pid: u32) -> Vec<String> {
+    let mut apps: Vec<String> = sessions
+        .iter()
+        .filter(|s| s.pid != 0 && s.pid != own_pid && s.state != SessionState::Expired)
+        .map(|s| s.process_name.clone())
+        .collect();
+    apps.sort();
+    apps.dedup();
+    apps
 }
 
 pub fn evaluate_setup(i: &SetupInputs<'_>) -> SetupReport {
     let cable_in = i.endpoints.iter().find(|e| e.is_vb_cable && !e.is_capture);
     let cable_out = i.endpoints.iter().find(|e| e.is_vb_cable && e.is_capture);
 
-    let mut conflicts: Vec<String> = i
-        .cable_input_sessions
-        .iter()
-        .filter(|s| s.pid != 0 && s.pid != i.own_pid && s.state != SessionState::Expired)
-        .map(|s| s.process_name.clone())
-        .collect();
-    conflicts.sort();
-    conflicts.dedup();
+    let conflicts = session_apps(i.cable_input_sessions, i.own_pid);
 
     let discord: Vec<&AudioSession> = i
         .cable_output_sessions
@@ -135,6 +154,10 @@ pub fn evaluate_setup(i: &SetupInputs<'_>) -> SetupReport {
         bluetooth_warning: is_bt(i.selected_mic) || is_bt(i.selected_headphones),
         sidetone_warning: i.listen_enabled == Some(true),
         remote_session: i.remote_session,
+        playback_on_cable: i
+            .defaults
+            .is_some_and(|d| playback_on_cable(d, i.endpoints)),
+        cable_repair_available: i.cable_repair_available,
     }
 }
 
@@ -185,6 +208,8 @@ mod tests {
             own_pid: 42,
             listen_enabled: Some(false),
             remote_session: false,
+            defaults: None,
+            cable_repair_available: false,
         }
     }
 
@@ -202,6 +227,7 @@ mod tests {
     #[test]
     fn fr12_reports_inactive_cable_sides_only_when_missing() {
         let inactive = |name: &str, cap: bool| InactiveCable {
+            id: format!("id:{name}"),
             name: name.into(),
             is_capture: cap,
             disabled: true,
@@ -263,6 +289,45 @@ mod tests {
         assert!(evaluate_setup(&i).bluetooth_warning);
         i.listen_enabled = Some(true);
         assert!(evaluate_setup(&i).sidetone_warning);
+    }
+
+    #[test]
+    fn fr12_warns_when_windows_plays_into_cable_input() {
+        use crate::cable::{DefaultEntry, DefaultsSnapshot};
+        use crate::routing::{Flow, Role};
+        let eps = endpoints();
+        let snap = |flow, id: &str| DefaultsSnapshot {
+            entries: vec![DefaultEntry {
+                flow,
+                role: Role::Multimedia,
+                id: id.into(),
+            }],
+        };
+        let mut i = inputs(&eps, &[], &[]);
+        assert!(!evaluate_setup(&i).playback_on_cable, "unknown defaults");
+        let hp = snap(Flow::Render, "hp");
+        i.defaults = Some(&hp);
+        assert!(!evaluate_setup(&i).playback_on_cable);
+        let cable_mic = snap(Flow::Capture, "cout");
+        i.defaults = Some(&cable_mic);
+        assert!(
+            !evaluate_setup(&i).playback_on_cable,
+            "CABLE Output as the default mic is fine"
+        );
+        let cable = snap(Flow::Render, "cin");
+        i.defaults = Some(&cable);
+        assert!(evaluate_setup(&i).playback_on_cable);
+    }
+
+    #[test]
+    fn session_apps_lists_other_live_apps_once() {
+        let s = [
+            sess(42, "tunedup.exe", SessionState::Active),
+            sess(5, "Discord.exe", SessionState::Active),
+            sess(6, "Discord.exe", SessionState::Inactive),
+            sess(9, "zoom.exe", SessionState::Expired),
+        ];
+        assert_eq!(session_apps(&s, 42), vec!["Discord.exe".to_string()]);
     }
 
     #[test]
