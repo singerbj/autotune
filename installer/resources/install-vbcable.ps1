@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
   Installs, repairs or removes the VB-Audio Virtual Cable driver for TunedUp
-  (FR-15, ADR 0011).
+  (FR-15, ADR 0012).
 
 .DESCRIPTION
   Called elevated by the NSIS installer hooks (installer/nsis/hooks.nsh) and

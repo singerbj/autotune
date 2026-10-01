@@ -1,4 +1,4 @@
-; TunedUp NSIS installer hooks (FR-15, FR-14, NFR-08, NFR-09, ADR 0011).
+; TunedUp NSIS installer hooks (FR-15, FR-14, NFR-08, NFR-09, ADR 0012).
 ;
 ; Hooked into Tauri's NSIS template via bundle.windows.nsis.installerHooks.
 ; Variables used from the template: $INSTDIR, $UpdateMode (1 when the
@@ -76,7 +76,7 @@ Var VtRemoveCable
       Pop $0
     ${EndIf}
     ; Ask about VB-Cable now, while tunedup.exe can still say who uses it
-    ; and move the default devices off it (ADR 0011).
+    ; and move the default devices off it (ADR 0012).
     SetRegView 64
     ReadRegDWORD $R0 HKLM "${VT_REGKEY}" "InstalledVBCable"
     SetRegView default

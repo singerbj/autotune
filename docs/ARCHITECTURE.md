@@ -117,11 +117,13 @@ Time-domain PSOLA driven by causal pitch detection. Algorithmic latency is about
 
 1. **Conditioning:** DC blocker, 70 Hz high-pass, and a noise gate with hysteresis.
 2. **Pitch detection:** McLeod Pitch Method on the most recent analysis window of already-captured audio. Detection adds no output delay; the correction lands a few ms late, which is inaudible.
-3. **Voicing decision:** below the clarity threshold, audio passes through unshifted (consonants, breath, noise).
-4. **Target selection:** snap the smoothed pitch to the nearest note in the active key and scale, with a \~20-cent hysteresis band to stop note flip-flopping.
-5. **Retune glide:** move the applied ratio toward the target with a time constant set by retune speed (0 ms = hard robotic snap, up to \~200 ms = natural).
-6. **PSOLA shift:** pitch marks on the input, Hann-windowed grains two periods long, overlap-added at the target spacing. Small shifts keep formants intact.
-7. **Output:** dry/wet mix (default 100% wet) and a soft limiter.
+3. **Voicing decision:** below the clarity threshold, audio passes through unshifted (consonants, breath, noise). Hard tune lowers the threshold and holds the last note through dropouts of up to 40 ms (ADR 0011).
+4. **Target selection:** snap the smoothed pitch to the nearest note in the active key and scale, with a \~20-cent hysteresis band to stop note flip-flopping (none in hard tune, so notes switch exactly at the midpoint).
+5. **Retune glide:** move the applied ratio toward the target with a time constant set by retune speed (0 ms = hard robotic snap, up to \~200 ms = natural). Hard tune always uses 0 ms and no humanize.
+6. **PSOLA shift:** pitch marks on the input, Hann-windowed grains two periods long, overlap-added at the target spacing. Small shifts keep formants intact. A formant shift resamples each grain by the formant ratio, which moves the spectral envelope but not the pitch.
+7. **Mix:** dry/wet mix (default 100% wet).
+8. **Effects (ADR 0011):** presence/air EQ and a compressor in series, then doubler, tempo-synced echo and plate reverb as parallel sends. Each send is routed to the headphones, the virtual mic, or both, so the tuner produces two outputs. No effect adds latency; at their defaults they are bit-transparent and idle sends aren't processed.
+9. **Output:** a soft limiter on each output, then the bypass crossfade to the raw input.
 
 **Voice range presets set the fixed latency**
 
@@ -131,7 +133,7 @@ Time-domain PSOLA driven by causal pitch detection. Algorithmic latency is about
 | Mid (default) | 100 Hz | \~10 ms |
 | High | 150 Hz | \~7 ms |
 
-**User parameters:** key, scale (chromatic, major, minor, custom note mask), retune speed, humanize, voice range, mix, gate threshold, bypass.
+**User parameters:** key, scale (chromatic, major, minor, custom note mask), retune speed, humanize, hard tune, formant, voice range, mix, gate threshold, bypass, and the effects (presence, air, compressor threshold and ratio; doubler level, detune, delay, route; echo level, tempo, note value, feedback, route; reverb level, size, decay, pre-delay, route). Built-in styles set the sound in one click and keep key, range, gate, tempo and routes.
 
 **Implementation rules**
 
@@ -163,7 +165,7 @@ The tuned voice reaches other apps by rendering into VB-Cable's "CABLE Input"; a
 - Per-app routing through `IAudioPolicyConfigFactory` is deferred to v2.
 - If the cable disappears while "Use for all apps" is on, the user's own mic is restored at once; it is re-applied when the cable comes back.
 
-**Keeping the cable healthy** ([ADR 0011](decisions/0011-vb-cable-lifecycle.md))
+**Keeping the cable healthy** ([ADR 0012](decisions/0012-vb-cable-lifecycle.md))
 
 - Windows often makes a new cable the default playback device. The installer saves the defaults before installing VB-Cable and puts back every role that moved onto the cable; the app repeats this at launch and on device changes for 120 s after the cable first appears.
 - The setup check flags "Windows plays into CABLE Input" with a one-click fix (`fix_playback_device`).
@@ -296,7 +298,7 @@ The biggest risks are dependencies outside our control: undocumented Windows API
 | --- | --- | --- |
 | `IPolicyConfig` breaks in a Windows update | "Use for all apps" stops working | Isolated in `tuner-win`; on failure, fall back to wizard instructions |
 | VB-Audio bundle terms don't work | Can't ship a one-click install | Link-out install for v1; own SYSVAD-based driver in v2 (EV cert + attestation signing) |
-| VB-Cable install/removal disturbs the user's audio (default devices, reboots) | No sound after install, wrong devices after removal | Defaults saved and restored around both, audio services restarted instead of a reboot when that is enough, in-app repair (ADR 0011) |
+| VB-Cable install/removal disturbs the user's audio (default devices, reboots) | No sound after install, wrong devices after removal | Defaults saved and restored around both, audio services restarted instead of a reboot when that is enough, in-app repair (ADR 0012) |
 | Headset driver only allows 10 ms shared output | Round trip \~27 ms | v2 "pro mode": exclusive headset output, system audio mixed in by the app via a second cable |
 | PSOLA artifacts on big shifts or fast retune | Audible warble | Cap shift range, crossfade on voicing changes, tune on golden files |
 | Another app holds the mic exclusively | Exclusive capture fails | Automatic fallback tier with a visible latency warning |

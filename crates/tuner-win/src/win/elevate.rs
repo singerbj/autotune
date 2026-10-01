@@ -1,4 +1,4 @@
-//! "Run as administrator" for the VB-Cable repair helper (ADR 0011).
+//! "Run as administrator" for the VB-Cable repair helper (ADR 0012).
 
 use std::path::Path;
 

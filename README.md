@@ -10,6 +10,11 @@ through VB-Cable.
   latency (Low 14 ms / Mid 10 ms / High 7 ms), dry/wet mix, noise gate,
   named presets, and a global hotkey (changeable in Settings) that turns
   tuning and headphone monitoring on and off together — both start off.
+  **Hard tune** for the instant, robotic pop snap, and a **formant** control.
+- **Effects:** presence/air EQ, compressor, doubler, tempo-synced echo and a
+  plate reverb, all with zero added latency. Doubler, echo and reverb can
+  each go to your headphones, to Discord, or both. One-click **styles**
+  (Chrome Snap, Velvet Echo, Night Drive, Natural) give you a finished vocal.
 - **Audio:** WASAPI exclusive → IAudioClient3 low-latency shared → shared
   fallback chain (ASIO tier behind a feature), shared-mode headphone monitor,
   adaptive resampling into VB-Cable, recovery from unplug/replug in < 2 s.
@@ -68,7 +73,7 @@ Silent: `"C:\Program Files\TunedUp\uninstall.exe" /S` (keeps VB-Cable).
 
 ```text
 crates/
-  tuner-dsp/     pitch detection (MPM), scale snap, PSOLA — pure Rust, no OS deps
+  tuner-dsp/     pitch detection (MPM), scale snap, PSOLA, vocal effects, styles — pure Rust, no OS deps
   tuner-audio/   AudioBackend trait, WASAPI (+ASIO) backends, rings, resampler, mock backend
   tuner-engine/  capture/monitor/cable threads, live params, meters, latency test, supervisor
   tuner-win/     IPolicyConfig + crash-safe restore, device notifications, sessions, setup check
@@ -94,6 +99,7 @@ Offline DSP without any audio hardware:
 ```sh
 cargo run -p tuner-cli -- gen --kind vocal -o vocal.wav
 cargo run -p tuner-cli -- tune -i vocal.wav -o tuned.wav --key C --scale major --retune-ms 5
+cargo run -p tuner-cli -- tune -i vocal.wav -o styled.wav --key C --style chrome-snap
 cargo run -p tuner-cli -- track -i tuned.wav
 ```
 

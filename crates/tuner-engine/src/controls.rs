@@ -2,7 +2,7 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, Ordering};
 
-use tuner_dsp::{Scale, TuningParams, VoiceRange};
+use tuner_dsp::{FxParams, Scale, TuningParams, VoiceRange, FX_WORDS};
 
 #[derive(Debug, Default)]
 struct AtomicF32(AtomicU32);
@@ -33,6 +33,9 @@ pub struct SharedControls {
     mix: AtomicF32,
     gate_db: AtomicF32,
     bypass: AtomicBool,
+    hard_tune: AtomicBool,
+    formant: AtomicF32,
+    fx: [AtomicU32; FX_WORDS],
     monitor_enabled: AtomicBool,
     monitor_volume: AtomicF32,
     generation: AtomicU64,
@@ -50,6 +53,9 @@ impl Default for SharedControls {
             mix: AtomicF32::default(),
             gate_db: AtomicF32::default(),
             bypass: AtomicBool::new(false),
+            hard_tune: AtomicBool::new(false),
+            formant: AtomicF32::default(),
+            fx: core::array::from_fn(|_| AtomicU32::new(0)),
             monitor_enabled: AtomicBool::new(true),
             monitor_volume: AtomicF32::new(1.0),
             generation: AtomicU64::new(0),
@@ -94,6 +100,11 @@ impl SharedControls {
         self.mix.store(p.mix);
         self.gate_db.store(p.gate_threshold_db);
         self.bypass.store(p.bypass, Ordering::Relaxed);
+        self.hard_tune.store(p.hard_tune, Ordering::Relaxed);
+        self.formant.store(p.formant_semitones);
+        for (slot, w) in self.fx.iter().zip(p.fx.to_words()) {
+            slot.store(w, Ordering::Relaxed);
+        }
         self.generation.fetch_add(1, Ordering::Release);
     }
 
@@ -117,6 +128,11 @@ impl SharedControls {
             mix: self.mix.load(),
             gate_threshold_db: self.gate_db.load(),
             bypass: self.bypass.load(Ordering::Relaxed),
+            hard_tune: self.hard_tune.load(Ordering::Relaxed),
+            formant_semitones: self.formant.load(),
+            fx: FxParams::from_words(&core::array::from_fn(|i| {
+                self.fx[i].load(Ordering::Relaxed)
+            })),
         }
     }
 
@@ -187,6 +203,11 @@ mod tests {
             mix: 0.7,
             gate_threshold_db: -45.0,
             bypass: true,
+            hard_tune: true,
+            formant_semitones: -1.5,
+            fx: tuner_dsp::Style::VelvetEcho
+                .apply(&TuningParams::default())
+                .fx,
         };
         c.set_params(&p);
         assert_eq!(c.params(), p);

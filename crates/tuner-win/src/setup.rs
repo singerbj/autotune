@@ -73,7 +73,7 @@ pub struct SetupReport {
     /// Running over Remote Desktop, where the PC's audio devices are hidden.
     pub remote_session: bool,
     /// Windows plays sound into CABLE Input by default, so the user hears
-    /// nothing from other apps (ADR 0011).
+    /// nothing from other apps (ADR 0012).
     pub playback_on_cable: bool,
     /// `repair_virtual_mic` can install or restart VB-Cable (the installer's
     /// helper script is present).

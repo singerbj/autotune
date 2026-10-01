@@ -57,6 +57,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::save_preset,
             commands::load_preset,
             commands::delete_preset,
+            commands::list_styles,
+            commands::apply_style,
             commands::get_update_status,
             commands::check_for_update,
             commands::install_update,
@@ -329,7 +331,7 @@ pub fn run() -> i32 {
         Ok(false) => {}
         Err(e) => tracing::warn!("could not restore default devices: {e}"),
     }
-    // ADR 0011: a VB-Cable install (often finished by a reboot) may have made
+    // ADR 0012: a VB-Cable install (often finished by a reboot) may have made
     // the cable the default speakers or mic.
     if let Ok(devices) = app_state.devices() {
         cable::settle_install(&app_state, &devices);

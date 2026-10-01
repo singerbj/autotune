@@ -34,7 +34,7 @@ function renderHealth(report: SetupReport) {
   return renderWithClient(<CableHealth report={report} rechecking={false} onRecheck={() => {}} />);
 }
 
-describe("CableHealth (FR-12, ADR 0011)", () => {
+describe("CableHealth (FR-12, ADR 0012)", () => {
   it("shows nothing when the cable is fine", () => {
     const { container } = renderHealth(healthy);
     expect(container).toBeEmptyDOMElement();

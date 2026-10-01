@@ -33,7 +33,7 @@ All are required for v1 except FR-21, which is a stretch goal.
 | FR-12 | Setup | First-run wizard: choose mic and headphones, detect VB-Cable and conflicts, warn about sidetone and Bluetooth, walk through the Discord checklist, run a latency test. |
 | FR-13 | Setup | Detect a Discord capture session on CABLE Output and show its status. |
 | FR-14 | Setup | "Use for all apps" sets CABLE Output as the default recording device (console and communications roles) and restores the previous defaults on quit and after a crash. |
-| FR-15 | Setup | The installer silently installs VB-Cable when it's missing, with one UAC prompt and a reboot only when Windows needs one (then resumes the wizard after it), without leaving the cable as the default playback or recording device (ADR 0011). |
+| FR-15 | Setup | The installer silently installs VB-Cable when it's missing, with one UAC prompt and a reboot only when Windows needs one (then resumes the wizard after it), without leaving the cable as the default playback or recording device (ADR 0012). |
 | FR-16 | Diagnostics | Show estimated latency live in the header; a "Measure" button runs an acoustic loopback test and reports ms. |
 | FR-17 | Diagnostics | Meters at 30 Hz: input level, detected pitch, target note, correction in cents. |
 | FR-18 | Diagnostics | Diagnostics panel with backend tier, periods, xruns, and callback p99/max, plus a "Copy diagnostics" button. |
@@ -41,6 +41,11 @@ All are required for v1 except FR-21, which is a stretch goal.
 | FR-20 | Shell | Settings persist across restarts in a versioned config schema. |
 | FR-21 | Shell | Save and load named tuning presets (stretch). |
 | FR-22 | Shell | Auto-update through a signed updater. |
+| FR-23 | Tuning | Hard tune: notes switch instantly at the midpoint between scale notes, retune and humanize are treated as 0, and correction holds through short detection dropouts. |
+| FR-24 | Tuning | Formant shift of ±4 semitones that changes the voice's character without changing the tuned note. |
+| FR-25 | Effects | Vocal effects after the tuner with no added latency: presence and air EQ, compressor, doubler, tempo-synced echo, and plate reverb. Every effect is transparent at its default. |
+| FR-26 | Effects | Doubler, echo and reverb can each be heard in the headphones, the virtual mic, or both. |
+| FR-27 | Effects | Built-in styles apply a finished sound (tuning feel, formant, effects) in one click and keep key, voice range, gate, echo tempo and routes. |
 
 ## Non-functional requirements
 

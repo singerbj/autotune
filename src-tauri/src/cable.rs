@@ -1,4 +1,4 @@
-//! VB-Cable lifecycle in the app (ADR 0011): keep Windows' default devices
+//! VB-Cable lifecycle in the app (ADR 0012): keep Windows' default devices
 //! off the cable around installs and removals, follow the cable appearing
 //! and disappearing, and repair it from the setup check.
 //!

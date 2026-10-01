@@ -27,7 +27,7 @@ Describe 'Get-RegValue' {
     }
 }
 
-Describe 'Test-VBCableActive (ADR 0011)' {
+Describe 'Test-VBCableActive (ADR 0012)' {
     It 'needs both sides active' {
         Mock Get-VBCableEndpointState { @(
                 [pscustomobject]@{ Flow = 'Render'; State = 1 },
@@ -48,7 +48,7 @@ Describe 'Test-VBCableActive (ADR 0011)' {
     }
 }
 
-Describe 'Invoke-Install (FR-15, ADR 0011)' {
+Describe 'Invoke-Install (FR-15, ADR 0012)' {
     BeforeEach {
         Mock Test-VBCableInstalled { $false }
         Mock Get-DriverPack { 'C:\pack\VBCABLE_Setup_x64.exe' }
@@ -93,7 +93,7 @@ Describe 'Invoke-Install (FR-15, ADR 0011)' {
     }
 }
 
-Describe 'Invoke-Repair (ADR 0011)' {
+Describe 'Invoke-Repair (ADR 0012)' {
     BeforeEach {
         Mock Invoke-AudioServiceRestart { }
         Mock Install-FromPack { }

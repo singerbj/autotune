@@ -6,28 +6,44 @@
 use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use tuner_dsp::{signals, Scale, Tuner, TunerConfig, TuningParams, VoiceRange};
+use tuner_dsp::{signals, Scale, Style, Tuner, TunerConfig, TuningParams, VoiceRange};
 
 fn bench(c: &mut Criterion) {
     let sr = 48_000.0;
     let input = signals::vocal_phrase(&[(0.0, 10.0, 196.0)], sr, 48_000, 1);
     let mut group = c.benchmark_group("process_128");
-    for (name, range) in [
-        ("voiced_mid", VoiceRange::Mid),
-        ("voiced_low", VoiceRange::Low),
+    let plain = |range| TuningParams {
+        scale: Scale::Major,
+        voice_range: range,
+        retune_ms: 10.0,
+        ..Default::default()
+    };
+    // `voiced_mid` is the NFR-03 gate; `styled_mid` runs every effect, a
+    // formant shift and the split outputs (FR-23 – FR-27).
+    for (name, params, split) in [
+        ("voiced_mid", plain(VoiceRange::Mid), false),
+        ("voiced_low", plain(VoiceRange::Low), false),
+        (
+            "styled_mid",
+            TuningParams {
+                formant_semitones: -1.0,
+                fx: tuner_dsp::FxParams {
+                    doubler_mix: 0.3,
+                    ..Style::ChromeSnap.apply(&plain(VoiceRange::Mid)).fx
+                },
+                ..Style::ChromeSnap.apply(&plain(VoiceRange::Mid))
+            },
+            true,
+        ),
     ] {
         let mut tuner = Tuner::new(TunerConfig {
             sample_rate: sr,
             seed: 1,
         })
         .expect("tuner");
-        tuner.set_params(&TuningParams {
-            scale: Scale::Major,
-            voice_range: range,
-            retune_ms: 10.0,
-            ..Default::default()
-        });
+        tuner.set_params(&params);
         let mut out = [0.0f32; 128];
+        let mut cable = [0.0f32; 128];
         // Warm up past the range fade and into the voiced state.
         for block in input.chunks_exact(128).take(100) {
             tuner.process(block, &mut out);
@@ -37,8 +53,12 @@ fn bench(c: &mut Criterion) {
             b.iter(|| {
                 let block = &input[pos..pos + 128];
                 pos = (pos + 128) % (input.len() - 128);
-                tuner.process(black_box(block), &mut out);
-                black_box(&out);
+                if split {
+                    tuner.process_split(black_box(block), &mut out, &mut cable);
+                } else {
+                    tuner.process(black_box(block), &mut out);
+                }
+                black_box((&out, &cable));
             })
         });
     }

@@ -4,7 +4,8 @@
 
 use tuner_dsp::scale::{hz_to_midi, midi_to_hz};
 use tuner_dsp::{
-    signals, DspMeters, PitchDetector, Scale, Tuner, TunerConfig, TuningParams, VoiceRange,
+    signals, DspMeters, FxParams, FxRoute, PitchDetector, Scale, Style, Tuner, TunerConfig,
+    TuningParams, VoiceRange,
 };
 
 const SR: f32 = 48_000.0;
@@ -365,5 +366,159 @@ fn works_at_common_sample_rates() {
         let e = det.detect(&y[s..s + win], &[], 70.0, 1000.0).unwrap();
         let cents = 1200.0 * (e.hz / 440.0).log2();
         assert!(cents.abs() < 5.0, "{sr}: {cents}");
+    }
+}
+
+/// Spread (max − min, in cents) of the detected pitch over `y[from..to]`.
+fn pitch_spread_cents(y: &[f32], from: usize, to: usize) -> f32 {
+    let mut det = PitchDetector::new(SR, 1372);
+    let v: Vec<f32> = (from..to - 1372)
+        .step_by(240)
+        .filter_map(|s| det.detect(&y[s..s + 1372], &[], 70.0, 1000.0))
+        .filter(|e| e.clarity > 0.8)
+        .map(|e| hz_to_midi(e.hz))
+        .collect();
+    assert!(v.len() > 20, "too few voiced frames");
+    let (lo, hi) = v
+        .iter()
+        .fold((f32::MAX, f32::MIN), |(lo, hi), &m| (lo.min(m), hi.max(m)));
+    (hi - lo) * 100.0
+}
+
+#[test]
+fn fr23_hard_tune_flattens_vibrato_and_ignores_retune() {
+    // A3 with ±10 cents of vibrato, 30 cents sharp.
+    let x = signals::vocal_phrase(&[(0.0, 2.0, 220.0 * (0.3f32 / 12.0).exp2())], SR, 96_000, 5);
+    let soft = TuningParams {
+        retune_ms: 200.0,
+        ..Default::default()
+    };
+    let (y_soft, _) = run(&mut tuner(soft), &x, 128);
+    let (y_hard, _) = run(
+        &mut tuner(TuningParams {
+            hard_tune: true,
+            ..soft
+        }),
+        &x,
+        128,
+    );
+    let spread_soft = pitch_spread_cents(&y_soft, 24_000, 90_000);
+    let spread_hard = pitch_spread_cents(&y_hard, 24_000, 90_000);
+    assert!(
+        spread_hard < spread_soft * 0.6,
+        "hard {spread_hard} vs soft {spread_soft}"
+    );
+    let err = (median_midi(&y_hard, 24_000, 90_000) - 57.0) * 100.0;
+    assert!(err.abs() <= 5.0, "hard tune {err} cents off A3");
+}
+
+#[test]
+fn fr23_hard_tune_rides_out_short_dropouts() {
+    let tone = signals::harmonic(220.0, SR, 24_000, 0.4, 10);
+    let mut x = tone.clone();
+    x.extend(signals::noise(1_440, 0.3, 7)); // 30 ms of breath
+    x.extend(&tone);
+    let gap = 24_000 / 128..(24_000 + 1_440) / 128 + 4;
+    let unvoiced_in_gap = |hard: bool| {
+        let (_, meters) = run(
+            &mut tuner(TuningParams {
+                hard_tune: hard,
+                ..Default::default()
+            }),
+            &x,
+            128,
+        );
+        meters[gap.clone()].iter().filter(|m| !m.voiced).count()
+    };
+    assert!(unvoiced_in_gap(false) > 0, "normal mode should drop out");
+    assert_eq!(unvoiced_in_gap(true), 0, "hard tune should hold the note");
+}
+
+#[test]
+fn fr26_split_outputs_match_process_when_everything_goes_both_ways() {
+    let x = signals::vocal_phrase(&[(0.0, 0.9, 196.0), (1.0, 1.9, 262.0)], SR, 96_000, 2);
+    let params = Style::VelvetEcho.apply(&TuningParams::default());
+    let mut a = tuner(params);
+    let mut b = tuner(params);
+    let (y, _) = run(&mut a, &x, 128);
+    let mut mon = vec![0.0; x.len()];
+    let mut cab = vec![0.0; x.len()];
+    for ((i, m), c) in x
+        .chunks(128)
+        .zip(mon.chunks_mut(128))
+        .zip(cab.chunks_mut(128))
+    {
+        b.process_split(i, m, c);
+    }
+    assert_eq!(y, mon);
+    assert_eq!(y, cab);
+}
+
+#[test]
+fn fr26_routed_effect_reaches_only_its_destination() {
+    let x = signals::vocal_phrase(&[(0.0, 0.5, 196.0)], SR, 96_000, 2);
+    let mut t = tuner(TuningParams {
+        fx: FxParams {
+            reverb_mix: 0.6,
+            reverb_decay: 0.8,
+            reverb_route: FxRoute::Headphones,
+            ..Default::default()
+        },
+        ..Default::default()
+    });
+    let mut mon = vec![0.0; x.len()];
+    let mut cab = vec![0.0; x.len()];
+    for ((i, m), c) in x
+        .chunks(128)
+        .zip(mon.chunks_mut(128))
+        .zip(cab.chunks_mut(128))
+    {
+        t.process_split(i, m, c);
+    }
+    // The virtual mic is exactly the plain tuner; the headphones ring on.
+    let (plain, _) = run(&mut tuner(TuningParams::default()), &x, 128);
+    assert_eq!(cab, plain, "reverb leaked into the virtual mic");
+    let energy = |y: &[f32]| y[36_000..60_000].iter().map(|v| v * v).sum::<f32>();
+    assert!(
+        energy(&mon) > 10.0 * energy(&cab),
+        "reverb missing from headphones"
+    );
+}
+
+#[test]
+fn fr27_every_style_renders_finite_and_bounded() {
+    let x = signals::vocal_phrase(
+        &[(0.0, 0.8, 150.0), (1.0, 1.7, 330.0), (2.0, 2.9, 90.0)],
+        SR,
+        144_000,
+        4,
+    );
+    let (dry, _) = run(&mut tuner(TuningParams::default()), &x, 128);
+    for style in Style::ALL {
+        let (y, _) = run(&mut tuner(style.apply(&TuningParams::default())), &x, 128);
+        assert!(
+            y.iter().all(|v| v.is_finite() && v.abs() <= 1.0),
+            "{style:?}"
+        );
+        let diff: f32 = y.iter().zip(&dry).map(|(a, b)| (a - b).powi(2)).sum();
+        assert!(diff > 1e-2, "{style:?} sounds like the plain tuner");
+    }
+}
+
+#[test]
+fn fr24_formant_shift_keeps_the_tuned_pitch() {
+    let x = signals::harmonic(440.0 * (0.3f32 / 12.0).exp2(), SR, 48_000, 0.4, 10);
+    for semis in [-4.0, 4.0] {
+        let (y, _) = run(
+            &mut tuner(TuningParams {
+                retune_ms: 0.0,
+                formant_semitones: semis,
+                ..Default::default()
+            }),
+            &x,
+            128,
+        );
+        let err = (median_midi(&y, 12_000, 48_000) - 69.0) * 100.0;
+        assert!(err.abs() <= 5.0, "formant {semis}: {err} cents");
     }
 }

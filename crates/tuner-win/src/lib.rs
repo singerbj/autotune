@@ -6,7 +6,7 @@
 //!   [`DefaultEndpointControl`] trait, and every failure has a fallback (the
 //!   wizard's manual instructions).
 //! * [`cable`] — keeps Windows' default devices off VB-Cable around installs
-//!   and removals (ADR 0011).
+//!   and removals (ADR 0012).
 //! * [`setup`] — pure evaluation of the setup check (FR-12, FR-13): VB-Cable
 //!   presence, cable conflicts, Discord session, Bluetooth/sidetone warnings.
 //! * Windows-only: device change notifications, audio session enumeration,

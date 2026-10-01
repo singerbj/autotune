@@ -23,7 +23,7 @@ import { unwrap } from "@/lib/result";
 import { CableHealth } from "./CableHealth";
 import { DeviceSelection } from "./DeviceSelection";
 
-/** Audio tab (FR-01, FR-03, FR-04, FR-14, ADR 0011). */
+/** Audio tab (FR-01, FR-03, FR-04, FR-14, ADR 0012). */
 export function AudioPanel() {
   const config = useConfig();
   const devices = useDevices();

@@ -1,7 +1,7 @@
 # Installer
 
 One per-machine NSIS installer produced by the Tauri bundler, with hooks
-that set up VB-Cable (FR-15, ADR 0011). The user sees one UAC prompt and,
+that set up VB-Cable (FR-15, ADR 0012). The user sees one UAC prompt and,
 only when a freshly installed VB-Cable doesn't come up without one, a reboot
 after which the app opens in the setup wizard.
 

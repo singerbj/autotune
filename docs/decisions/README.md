@@ -16,4 +16,5 @@ docs/decisions/ instead of silently diverging").
 | [0008](0008-vb-cable-buffer-size.md) | VB-Cable internal buffer size is left to the user | Accepted |
 | [0009](0009-elevated-as-another-account.md) | Elevated as another account (Administrator Protection) | Accepted |
 | [0010](0010-tuning-hotkey-gates-monitoring.md) | The tuning hotkey turns tuning and monitoring on together, off at launch | Accepted |
-| [0011](0011-vb-cable-lifecycle.md) | Managing VB-Cable's install, removal and repair | Accepted |
+| [0011](0011-hard-tune-and-vocal-effects.md) | Hard tune, formant shift and a routed vocal effects chain | Accepted |
+| [0012](0012-vb-cable-lifecycle.md) | Managing VB-Cable's install, removal and repair | Accepted |

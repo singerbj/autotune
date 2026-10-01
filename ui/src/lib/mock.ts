@@ -15,11 +15,14 @@ import type {
   EngineStatus,
   EngineStatusEvent,
   events as TauriEvents,
+  FxParams,
   HotkeyStatus,
   MeterSnapshot,
   Preset,
   SetupReport,
   StreamInfo,
+  Style,
+  StyleInfo,
   SupervisorStatus,
   TuningParams,
   UpdateStatus,
@@ -52,7 +55,7 @@ export interface MockBackend {
   reset: () => void;
   /** Replace the device list and fire `devicesChangedEvent`. */
   setDevices: (devices: DeviceInfo[]) => void;
-  /** Make Windows "play into CABLE Input" (ADR 0011). */
+  /** Make Windows "play into CABLE Input" (ADR 0012). */
   setPlaybackOnCable: (on: boolean) => void;
 }
 
@@ -189,6 +192,126 @@ const DEVICES: DeviceInfo[] = [
   },
 ];
 
+const DEFAULT_FX: FxParams = {
+  presenceDb: 0,
+  airDb: 0,
+  compThresholdDb: 0,
+  compRatio: 4,
+  doublerMix: 0,
+  doublerDetuneCents: 10,
+  doublerDelayMs: 18,
+  doublerRoute: "both",
+  delayMix: 0,
+  delayBpm: 120,
+  delayDivision: "eighth",
+  delayFeedback: 0.3,
+  delayRoute: "both",
+  reverbMix: 0,
+  reverbSize: 0.6,
+  reverbDecay: 0.5,
+  reverbPredelayMs: 20,
+  reverbRoute: "both",
+};
+
+/** Mirrors `tuner_dsp::Style` (FR-27). */
+const STYLES: ReadonlyArray<
+  StyleInfo & {
+    tune: Pick<TuningParams, "hardTune" | "retuneMs" | "humanize" | "formantSemitones">;
+    fx: Partial<FxParams>;
+  }
+> = [
+  {
+    style: "chromeSnap",
+    name: "Chrome Snap",
+    description: "Hard-snapped robotic croon with a glossy plate and slap echo.",
+    tune: { hardTune: true, retuneMs: 0, humanize: 0, formantSemitones: -1 },
+    fx: {
+      presenceDb: 2,
+      airDb: 2,
+      compThresholdDb: -18,
+      compRatio: 3,
+      delayMix: 0.12,
+      delayDivision: "eighth",
+      delayFeedback: 0.3,
+      reverbMix: 0.2,
+      reverbSize: 0.6,
+      reverbDecay: 0.55,
+      reverbPredelayMs: 20,
+    },
+  },
+  {
+    style: "velvetEcho",
+    name: "Velvet Echo",
+    description: "Smooth, fast tuning with a doubled voice, wide reverb and echo.",
+    tune: { hardTune: false, retuneMs: 5, humanize: 0.1, formantSemitones: 0 },
+    fx: {
+      presenceDb: 1.5,
+      airDb: 3,
+      compThresholdDb: -20,
+      compRatio: 3,
+      doublerMix: 0.5,
+      doublerDetuneCents: 10,
+      doublerDelayMs: 18,
+      delayMix: 0.15,
+      delayDivision: "quarter",
+      delayFeedback: 0.35,
+      reverbMix: 0.25,
+      reverbSize: 0.7,
+      reverbDecay: 0.6,
+      reverbPredelayMs: 30,
+    },
+  },
+  {
+    style: "nightDrive",
+    name: "Night Drive",
+    description: "Hard tune, heavy compression and a bright, close trap sound.",
+    tune: { hardTune: true, retuneMs: 0, humanize: 0, formantSemitones: 0 },
+    fx: {
+      presenceDb: 3,
+      airDb: 4,
+      compThresholdDb: -24,
+      compRatio: 6,
+      doublerMix: 0.25,
+      doublerDetuneCents: 8,
+      doublerDelayMs: 14,
+      delayMix: 0.18,
+      delayDivision: "dottedEighth",
+      delayFeedback: 0.4,
+      reverbMix: 0.15,
+      reverbSize: 0.35,
+      reverbDecay: 0.4,
+      reverbPredelayMs: 10,
+    },
+  },
+  {
+    style: "natural",
+    name: "Natural",
+    description: "Gentle correction that keeps your vibrato, plus a little room.",
+    tune: { hardTune: false, retuneMs: 40, humanize: 0.5, formantSemitones: 0 },
+    fx: { reverbMix: 0.1, reverbSize: 0.5, reverbDecay: 0.45, reverbPredelayMs: 15 },
+  },
+];
+
+/** Same rules as `Style::apply`: keep key, range, gate, bypass, tempo and routes. */
+function applyStyle(style: Style, base: TuningParams): TuningParams {
+  const s = STYLES.find((x) => x.style === style);
+  if (s === undefined) return base;
+  return {
+    ...base,
+    ...s.tune,
+    scale: style !== "natural" && base.scale === "chromatic" ? "major" : base.scale,
+    mix: 1,
+    fx: {
+      ...DEFAULT_FX,
+      ...s.fx,
+      delayBpm: base.fx.delayBpm,
+      doublerRoute: base.fx.doublerRoute,
+      delayRoute: base.fx.delayRoute,
+      reverbRoute: base.fx.reverbRoute,
+    },
+  };
+}
+
 const DEFAULT_PARAMS: TuningParams = {
   key: 0,
   scale: "major",
@@ -200,6 +323,9 @@ const DEFAULT_PARAMS: TuningParams = {
   mix: 1,
   gateThresholdDb: -55,
   bypass: false,
+  hardTune: false,
+  formantSemitones: 0,
+  fx: DEFAULT_FX,
 };
 
 function initialConfig(): AppConfig {
@@ -222,7 +348,10 @@ function initialConfig(): AppConfig {
     bypassHotkey: "CommandOrControl+Alt+B",
     autoUpdate: true,
     presets: [
-      { name: "Hard tune", params: { ...DEFAULT_PARAMS, retuneMs: 0, humanize: 0 } },
+      {
+        name: "Hard tune",
+        params: { ...DEFAULT_PARAMS, retuneMs: 0, humanize: 0, hardTune: true },
+      },
       { name: "Subtle", params: { ...DEFAULT_PARAMS, retuneMs: 120, humanize: 0.6, mix: 0.8 } },
     ],
     measuredLatencyMs: null,
@@ -587,6 +716,15 @@ export function createMockBackend(): MockBackend {
       if (patch.mix != null) params.mix = patch.mix;
       if (patch.gateThresholdDb != null) params.gateThresholdDb = patch.gateThresholdDb;
       if (patch.bypass != null) params.bypass = patch.bypass;
+      if (patch.hardTune != null) params.hardTune = patch.hardTune;
+      if (patch.formantSemitones != null) params.formantSemitones = patch.formantSemitones;
+      if (patch.fx != null) {
+        const fx: FxParams = { ...params.fx };
+        for (const [key, value] of Object.entries(patch.fx)) {
+          if (value != null) Object.assign(fx, { [key]: value });
+        }
+        params.fx = fx;
+      }
       const rangeChanged = params.voiceRange !== state.config.params.voiceRange;
       state.config = { ...state.config, params };
       if (rangeChanged) publishStatus();
@@ -718,6 +856,15 @@ export function createMockBackend(): MockBackend {
       state.config = { ...state.config, params };
       if (rangeChanged) publishStatus();
       return Promise.resolve(ok({ ...params }));
+    },
+
+    listStyles: () =>
+      Promise.resolve(STYLES.map(({ style, name, description }) => ({ style, name, description }))),
+
+    applyStyle: (style) => {
+      const params = applyStyle(style, state.config.params);
+      state.config = { ...state.config, params };
+      return Promise.resolve({ ...params });
     },
 
     deletePreset: (name) => {

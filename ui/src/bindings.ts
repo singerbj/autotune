@@ -28,7 +28,7 @@ export const commands = {
 	 *  Live parameter change (FR-11): atomics to the audio thread, config saved
 	 *  by the control loop.
 	 */
-	setParams: (patch: ParamsPatch) => __TAURI_INVOKE<TuningParams>("set_params", { patch: ({...patch,retuneMs:patch.retuneMs==null?patch.retuneMs:patch.retuneMs,humanize:patch.humanize==null?patch.humanize:patch.humanize,mix:patch.mix==null?patch.mix:patch.mix,gateThresholdDb:patch.gateThresholdDb==null?patch.gateThresholdDb:patch.gateThresholdDb}) }),
+	setParams: (patch: ParamsPatch) => __TAURI_INVOKE<TuningParams>("set_params", { patch: ({...patch,retuneMs:patch.retuneMs==null?patch.retuneMs:patch.retuneMs,humanize:patch.humanize==null?patch.humanize:patch.humanize,mix:patch.mix==null?patch.mix:patch.mix,gateThresholdDb:patch.gateThresholdDb==null?patch.gateThresholdDb:patch.gateThresholdDb,formantSemitones:patch.formantSemitones==null?patch.formantSemitones:patch.formantSemitones,fx:patch.fx==null?patch.fx:({...patch.fx,presenceDb:patch.fx.presenceDb==null?patch.fx.presenceDb:patch.fx.presenceDb,airDb:patch.fx.airDb==null?patch.fx.airDb:patch.fx.airDb,compThresholdDb:patch.fx.compThresholdDb==null?patch.fx.compThresholdDb:patch.fx.compThresholdDb,compRatio:patch.fx.compRatio==null?patch.fx.compRatio:patch.fx.compRatio,doublerMix:patch.fx.doublerMix==null?patch.fx.doublerMix:patch.fx.doublerMix,doublerDetuneCents:patch.fx.doublerDetuneCents==null?patch.fx.doublerDetuneCents:patch.fx.doublerDetuneCents,doublerDelayMs:patch.fx.doublerDelayMs==null?patch.fx.doublerDelayMs:patch.fx.doublerDelayMs,delayMix:patch.fx.delayMix==null?patch.fx.delayMix:patch.fx.delayMix,delayBpm:patch.fx.delayBpm==null?patch.fx.delayBpm:patch.fx.delayBpm,delayFeedback:patch.fx.delayFeedback==null?patch.fx.delayFeedback:patch.fx.delayFeedback,reverbMix:patch.fx.reverbMix==null?patch.fx.reverbMix:patch.fx.reverbMix,reverbSize:patch.fx.reverbSize==null?patch.fx.reverbSize:patch.fx.reverbSize,reverbDecay:patch.fx.reverbDecay==null?patch.fx.reverbDecay:patch.fx.reverbDecay,reverbPredelayMs:patch.fx.reverbPredelayMs==null?patch.fx.reverbPredelayMs:patch.fx.reverbPredelayMs})}) }),
 	setBypass: (bypass: boolean) => __TAURI_INVOKE<boolean>("set_bypass", { bypass }),
 	/**  The registered tuning hotkey and any problem registering the configured one. */
 	getHotkeyStatus: () => __TAURI_INVOKE<HotkeyStatus>("get_hotkey_status"),
@@ -36,19 +36,19 @@ export const commands = {
 	runLatencyTest: () => typedError<LatencyResult, AppError>(__TAURI_INVOKE("run_latency_test")),
 	/**
 	 *  VB-Cable, conflicts, Discord session, sidetone and Bluetooth (FR-12, FR-13),
-	 *  and whether Windows plays into the cable (ADR 0011).
+	 *  and whether Windows plays into the cable (ADR 0012).
 	 */
 	runSetupCheck: () => typedError<SetupReport, AppError>(__TAURI_INVOKE("run_setup_check")),
 	/**  "Use for all apps" (FR-14). */
 	setRouteAllApps: (enabled: boolean) => typedError<boolean, AppError>(__TAURI_INVOKE("set_route_all_apps", { enabled })),
 	/**
 	 *  Turn a disabled cable back on, or install / restart VB-Cable with one UAC
-	 *  prompt (ADR 0011).
+	 *  prompt (ADR 0012).
 	 */
 	repairVirtualMic: () => typedError<RepairOutcome, AppError>(__TAURI_INVOKE("repair_virtual_mic")),
 	/**
 	 *  Windows plays into CABLE Input: move the default speakers back to a real
-	 *  device (ADR 0011).
+	 *  device (ADR 0012).
 	 */
 	fixPlaybackDevice: () => typedError<null, AppError>(__TAURI_INVOKE("fix_playback_device")),
 	openAsioPanel: () => typedError<null, AppError>(__TAURI_INVOKE("open_asio_panel")),
@@ -62,6 +62,12 @@ export const commands = {
 	savePreset: (name: string) => typedError<Preset[], AppError>(__TAURI_INVOKE("save_preset", { name })),
 	loadPreset: (name: string) => typedError<TuningParams, AppError>(__TAURI_INVOKE("load_preset", { name })),
 	deletePreset: (name: string) => __TAURI_INVOKE<Preset[]>("delete_preset", { name }),
+	listStyles: () => __TAURI_INVOKE<StyleInfo[]>("list_styles"),
+	/**
+	 *  Apply a built-in style to the current parameters (FR-27). Key, voice
+	 *  range, gate, bypass, echo tempo and effect routes stay as they are.
+	 */
+	applyStyle: (style: Style) => __TAURI_INVOKE<TuningParams>("apply_style", { style }),
 	getUpdateStatus: () => __TAURI_INVOKE<UpdateStatus>("get_update_status"),
 	/**  Manual "Check for updates" (FR-22). */
 	checkForUpdate: () => typedError<UpdateStatus, AppError>(__TAURI_INVOKE("check_for_update")),
@@ -150,6 +156,9 @@ export type ConfigPatch = {
 	autoUpdate?: boolean | null,
 };
 
+/**  Echo length as a note value at [`FxParams::delay_bpm`]. */
+export type DelayDivision = "quarter" | "eighth" | "dottedEighth" | "sixteenth";
+
 /**  One capture or render endpoint (FR-01). */
 export type DeviceInfo = {
 	/**  Stable endpoint ID (persisted in config). */
@@ -227,6 +236,74 @@ export type ErrorEvent = string;
 
 export type ErrorKind = "device" | "deviceInUse" | "notRunning" | "latency" | "unsupported" | "config" | "update" | "internal";
 
+/**
+ *  Effects chain parameters (FR-25). Every effect is neutral at its default:
+ *  EQ gains 0 dB, compressor threshold 0 dBFS, all send mixes 0.
+ */
+export type FxParams = {
+	/**  Presence peak at 3.5 kHz, −6 … +12 dB. */
+	presenceDb: number,
+	/**  Air shelf from 10 kHz, −6 … +12 dB. */
+	airDb: number,
+	/**  Compressor threshold, −40 … 0 dBFS; 0 turns it off. */
+	compThresholdDb: number,
+	/**  Compressor ratio, 1 … 10. */
+	compRatio: number,
+	/**  Doubler level, 0 … 1. */
+	doublerMix: number,
+	/**  Doubler pitch spread, 0 … 30 cents. */
+	doublerDetuneCents: number,
+	/**  Doubler delay, 10 … 40 ms. */
+	doublerDelayMs: number,
+	doublerRoute: FxRoute,
+	/**  Echo level, 0 … 1. */
+	delayMix: number,
+	/**  Song tempo for the echo, 60 … 200 BPM. */
+	delayBpm: number,
+	delayDivision: DelayDivision,
+	/**  Echo feedback, 0 … 0.9. */
+	delayFeedback: number,
+	delayRoute: FxRoute,
+	/**  Reverb level, 0 … 1. */
+	reverbMix: number,
+	/**  Plate size, 0 … 1. */
+	reverbSize: number,
+	/**  Tail length, 0 … 1 (≈ 0.3 s … 6 s). */
+	reverbDecay: number,
+	/**  Gap before the reverb starts, 0 … 100 ms. */
+	reverbPredelayMs: number,
+	reverbRoute: FxRoute,
+};
+
+/**  Partial effects update (FR-25, FR-26); `None` leaves a field alone. */
+export type FxPatch = {
+	presenceDb?: number | null,
+	airDb?: number | null,
+	compThresholdDb?: number | null,
+	compRatio?: number | null,
+	doublerMix?: number | null,
+	doublerDetuneCents?: number | null,
+	doublerDelayMs?: number | null,
+	doublerRoute?: FxRoute | null,
+	delayMix?: number | null,
+	delayBpm?: number | null,
+	delayDivision?: DelayDivision | null,
+	delayFeedback?: number | null,
+	delayRoute?: FxRoute | null,
+	reverbMix?: number | null,
+	reverbSize?: number | null,
+	reverbDecay?: number | null,
+	reverbPredelayMs?: number | null,
+	reverbRoute?: FxRoute | null,
+};
+
+/**  Which outputs a time-based effect is heard on (FR-26). */
+export type FxRoute = "both" | 
+/**  Only in your headphones (the monitor). */
+"headphones" | 
+/**  Only in the virtual mic (Discord and other apps). */
+"discord";
+
 /**  What the UI shows under the hotkey setting. */
 export type HotkeyStatus = {
 	/**  The registered accelerator; `None` if nothing could be registered. */
@@ -287,6 +364,9 @@ export type ParamsPatch = {
 	mix?: number | null,
 	gateThresholdDb?: number | null,
 	bypass?: boolean | null,
+	hardTune?: boolean | null,
+	formantSemitones?: number | null,
+	fx?: FxPatch | null,
 };
 
 /**  A named tuning preset (FR-21). */
@@ -339,7 +419,7 @@ export type SetupReport = {
 	remoteSession: boolean,
 	/**
 	 *  Windows plays sound into CABLE Input by default, so the user hears
-	 *  nothing from other apps (ADR 0011).
+	 *  nothing from other apps (ADR 0012).
 	 */
 	playbackOnCable: boolean,
 	/**
@@ -362,6 +442,24 @@ export type StreamInfo = {
 	streamLatencyFrames: number,
 	/**  Tiers tried before this one, with the reason each failed. */
 	fallbacks: TierAttempt[],
+};
+
+/**  A built-in style. */
+export type Style = 
+/**  Hard-snapped robotic croon with a glossy plate and slap echo. */
+"chromeSnap" | 
+/**  Smooth, fast-tuned R&B voice: doubled, with a wide reverb and echo. */
+"velvetEcho" | 
+/**  Dark trap vocal: hard tune, heavy compression, bright EQ, short plate. */
+"nightDrive" | 
+/**  Gentle correction that keeps your vibrato, with a touch of room. */
+"natural";
+
+/**  A built-in sound style as the UI lists it (FR-27). */
+export type StyleInfo = {
+	style: Style,
+	name: string,
+	description: string,
 };
 
 export type SupervisorState = "stopped" | "running" | 
@@ -402,6 +500,18 @@ export type TuningParams = {
 	gateThresholdDb: number,
 	/**  Click-free bypass (FR-10). */
 	bypass: boolean,
+	/**
+	 *  Hard tune (FR-23): instant note switches, retune and humanize treated
+	 *  as 0, and more forgiving voicing so the effect never drops out.
+	 */
+	hardTune: boolean,
+	/**
+	 *  Formant shift in semitones, −4 … +4 (FR-24). Negative sounds like a
+	 *  longer throat (deeper), positive like a shorter one (brighter).
+	 */
+	formantSemitones: number,
+	/**  Vocal effects after the tuner (FR-25, FR-26). */
+	fx: FxParams,
 };
 
 /**  Auto-update progress (FR-22). */

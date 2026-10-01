@@ -62,7 +62,7 @@ Headset: ______________________ (wired USB, ~3 ms periods)
 - [ ] Unplug the headset while running: the app recovers on another device
       within 2 s; replug: it switches back within 2 s.
 
-## 7. Repair (ADR 0011)
+## 7. Repair (ADR 0012)
 
 - [ ] Sound settings → disable CABLE Output: the Audio tab shows "Turn
       VB-Cable back on"; it works without a UAC prompt.

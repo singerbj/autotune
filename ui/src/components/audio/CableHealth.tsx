@@ -12,7 +12,7 @@ interface CableHealthProps {
 }
 
 /**
- * VB-Cable problems with one-click fixes (FR-12, ADR 0011): the cable is
+ * VB-Cable problems with one-click fixes (FR-12, ADR 0012): the cable is
  * missing or turned off, or Windows plays everything into CABLE Input.
  * Renders nothing when the cable is fine.
  */

@@ -1,4 +1,4 @@
-//! Keeping Windows' default devices off VB-Cable (ADR 0011).
+//! Keeping Windows' default devices off VB-Cable (ADR 0012).
 //!
 //! Windows often makes a newly installed cable the default playback device,
 //! so every app's sound goes into "CABLE Input" and the user hears nothing.

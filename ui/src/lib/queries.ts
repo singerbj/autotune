@@ -7,6 +7,7 @@ import type {
   EngineStatusEvent,
   ParamsPatch,
   Preset,
+  Style,
   TuningParams,
   UpdateStatus,
 } from "@/bindings";
@@ -22,6 +23,7 @@ export const queryKeys = {
   updateStatus: ["updateStatus"],
   setupCheck: ["setupCheck"],
   hotkeyStatus: ["hotkeyStatus"],
+  styles: ["styles"],
 } as const;
 
 // --- cache writers (used by mutations and event listeners) -----------------
@@ -84,6 +86,15 @@ export function useHotkeyStatus() {
   return useQuery({
     queryKey: queryKeys.hotkeyStatus,
     queryFn: () => commands.getHotkeyStatus(),
+  });
+}
+
+/** FR-27: the built-in styles (fixed for the app's lifetime). */
+export function useStyles() {
+  return useQuery({
+    queryKey: queryKeys.styles,
+    queryFn: () => commands.listStyles(),
+    staleTime: Number.POSITIVE_INFINITY,
   });
 }
 
@@ -170,7 +181,7 @@ function invalidateCable(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: queryKeys.devices });
 }
 
-/** Turn a disabled cable back on, or install / restart VB-Cable (ADR 0011). */
+/** Turn a disabled cable back on, or install / restart VB-Cable (ADR 0012). */
 export function useRepairVirtualMic() {
   const qc = useQueryClient();
   return useMutation({
@@ -180,7 +191,7 @@ export function useRepairVirtualMic() {
   });
 }
 
-/** Move Windows' default speakers off CABLE Input (ADR 0011). */
+/** Move Windows' default speakers off CABLE Input (ADR 0012). */
 export function useFixPlaybackDevice() {
   const qc = useQueryClient();
   return useMutation({
@@ -214,6 +225,15 @@ export function useLoadPreset() {
     mutationFn: (name: string) => unwrap(commands.loadPreset(name)),
     onSuccess: (params) => setParamsCache(qc, params),
     meta: { errorTitle: "Couldn't load preset" },
+  });
+}
+
+export function useApplyStyle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (style: Style) => commands.applyStyle(style),
+    onSuccess: (params) => setParamsCache(qc, params),
+    meta: { errorTitle: "Couldn't apply style" },
   });
 }
 

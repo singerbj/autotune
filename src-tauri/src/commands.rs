@@ -6,7 +6,7 @@ use specta::Type;
 use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
 use tuner_audio::DeviceInfo;
-use tuner_dsp::{Scale, TuningParams, VoiceRange};
+use tuner_dsp::{DelayDivision, FxParams, FxRoute, Scale, Style, TuningParams, VoiceRange};
 use tuner_engine::LatencyResult;
 use tuner_win::{DefaultsSnapshot, InactiveCable, SetupInputs, SetupReport};
 
@@ -144,6 +144,61 @@ pub struct ParamsPatch {
     pub mix: Option<f32>,
     pub gate_threshold_db: Option<f32>,
     pub bypass: Option<bool>,
+    pub hard_tune: Option<bool>,
+    pub formant_semitones: Option<f32>,
+    pub fx: Option<FxPatch>,
+}
+
+/// Partial effects update (FR-25, FR-26); `None` leaves a field alone.
+#[derive(Deserialize, Debug, Clone, Default, Type)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FxPatch {
+    pub presence_db: Option<f32>,
+    pub air_db: Option<f32>,
+    pub comp_threshold_db: Option<f32>,
+    pub comp_ratio: Option<f32>,
+    pub doubler_mix: Option<f32>,
+    pub doubler_detune_cents: Option<f32>,
+    pub doubler_delay_ms: Option<f32>,
+    pub doubler_route: Option<FxRoute>,
+    pub delay_mix: Option<f32>,
+    pub delay_bpm: Option<f32>,
+    pub delay_division: Option<DelayDivision>,
+    pub delay_feedback: Option<f32>,
+    pub delay_route: Option<FxRoute>,
+    pub reverb_mix: Option<f32>,
+    pub reverb_size: Option<f32>,
+    pub reverb_decay: Option<f32>,
+    pub reverb_predelay_ms: Option<f32>,
+    pub reverb_route: Option<FxRoute>,
+}
+
+impl FxPatch {
+    pub fn apply(self, f: &mut FxParams) {
+        fn set<T>(dst: &mut T, v: Option<T>) {
+            if let Some(v) = v {
+                *dst = v;
+            }
+        }
+        set(&mut f.presence_db, self.presence_db);
+        set(&mut f.air_db, self.air_db);
+        set(&mut f.comp_threshold_db, self.comp_threshold_db);
+        set(&mut f.comp_ratio, self.comp_ratio);
+        set(&mut f.doubler_mix, self.doubler_mix);
+        set(&mut f.doubler_detune_cents, self.doubler_detune_cents);
+        set(&mut f.doubler_delay_ms, self.doubler_delay_ms);
+        set(&mut f.doubler_route, self.doubler_route);
+        set(&mut f.delay_mix, self.delay_mix);
+        set(&mut f.delay_bpm, self.delay_bpm);
+        set(&mut f.delay_division, self.delay_division);
+        set(&mut f.delay_feedback, self.delay_feedback);
+        set(&mut f.delay_route, self.delay_route);
+        set(&mut f.reverb_mix, self.reverb_mix);
+        set(&mut f.reverb_size, self.reverb_size);
+        set(&mut f.reverb_decay, self.reverb_decay);
+        set(&mut f.reverb_predelay_ms, self.reverb_predelay_ms);
+        set(&mut f.reverb_route, self.reverb_route);
+    }
 }
 
 impl ParamsPatch {
@@ -174,6 +229,15 @@ impl ParamsPatch {
         }
         if let Some(v) = self.bypass {
             p.bypass = v;
+        }
+        if let Some(v) = self.hard_tune {
+            p.hard_tune = v;
+        }
+        if let Some(v) = self.formant_semitones {
+            p.formant_semitones = v;
+        }
+        if let Some(fx) = self.fx {
+            fx.apply(&mut p.fx);
         }
         *p = p.sanitized();
     }
@@ -231,7 +295,7 @@ pub async fn run_latency_test(app: AppHandle) -> AppResult<LatencyResult> {
 }
 
 /// VB-Cable, conflicts, Discord session, sidetone and Bluetooth (FR-12, FR-13),
-/// and whether Windows plays into the cable (ADR 0011).
+/// and whether Windows plays into the cable (ADR 0012).
 #[tauri::command]
 #[specta::specta]
 pub fn run_setup_check(app: AppHandle) -> AppResult<SetupReport> {
@@ -291,7 +355,7 @@ pub fn run_setup_check(app: AppHandle) -> AppResult<SetupReport> {
 }
 
 /// Turn a disabled cable back on, or install / restart VB-Cable with one UAC
-/// prompt (ADR 0011).
+/// prompt (ADR 0012).
 #[tauri::command]
 #[specta::specta]
 pub async fn repair_virtual_mic(app: AppHandle) -> AppResult<RepairOutcome> {
@@ -306,7 +370,7 @@ pub async fn repair_virtual_mic(app: AppHandle) -> AppResult<RepairOutcome> {
 }
 
 /// Windows plays into CABLE Input: move the default speakers back to a real
-/// device (ADR 0011).
+/// device (ADR 0012).
 #[tauri::command]
 #[specta::specta]
 pub fn fix_playback_device(app: AppHandle) -> AppResult<()> {
@@ -449,6 +513,43 @@ pub fn load_preset(app: AppHandle, name: String) -> AppResult<TuningParams> {
     Ok(params)
 }
 
+/// A built-in sound style as the UI lists it (FR-27).
+#[derive(Serialize, Debug, Clone, PartialEq, Type)]
+#[serde(rename_all = "camelCase")]
+pub struct StyleInfo {
+    pub style: Style,
+    pub name: String,
+    pub description: String,
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn list_styles() -> Vec<StyleInfo> {
+    Style::ALL
+        .into_iter()
+        .map(|style| StyleInfo {
+            style,
+            name: style.name().into(),
+            description: style.description().into(),
+        })
+        .collect()
+}
+
+/// Apply a built-in style to the current parameters (FR-27). Key, voice
+/// range, gate, bypass, echo tempo and effect routes stay as they are.
+#[tauri::command]
+#[specta::specta]
+pub fn apply_style(app: AppHandle, style: Style) -> TuningParams {
+    let s = state(&app);
+    let bypass = s.controls.bypass();
+    let params = s.update_config(|c| {
+        c.params = style.apply(&TuningParams { bypass, ..c.params });
+        c.params
+    });
+    s.controls.set_params(&params);
+    params
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn delete_preset(app: AppHandle, name: String) -> Vec<Preset> {
@@ -512,6 +613,42 @@ mod tests {
         assert_eq!(p.retune_ms, 200.0);
         assert_eq!(p.scale, Scale::Major);
         assert_eq!(p.mix, 1.0, "untouched fields keep their values");
+    }
+
+    #[test]
+    fn fr23_fr25_params_patch_merges_effects_field_by_field() {
+        let mut p = TuningParams::default();
+        p.fx.reverb_mix = 0.3;
+        ParamsPatch {
+            hard_tune: Some(true),
+            formant_semitones: Some(-9.0),
+            fx: Some(FxPatch {
+                delay_mix: Some(0.2),
+                delay_division: Some(DelayDivision::DottedEighth),
+                reverb_route: Some(FxRoute::Headphones),
+                comp_ratio: Some(50.0),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+        .apply(&mut p);
+        assert!(p.hard_tune);
+        assert_eq!(p.formant_semitones, -4.0);
+        assert_eq!(p.fx.delay_mix, 0.2);
+        assert_eq!(p.fx.delay_division, DelayDivision::DottedEighth);
+        assert_eq!(p.fx.reverb_route, FxRoute::Headphones);
+        assert_eq!(p.fx.comp_ratio, 10.0);
+        assert_eq!(
+            p.fx.reverb_mix, 0.3,
+            "untouched effect fields keep their values"
+        );
+    }
+
+    #[test]
+    fn fr27_lists_every_style() {
+        let styles = list_styles();
+        assert_eq!(styles.len(), Style::ALL.len());
+        assert_eq!(styles[0].name, "Chrome Snap");
     }
 
     #[test]

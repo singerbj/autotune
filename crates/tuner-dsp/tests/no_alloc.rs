@@ -7,7 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use assert_no_alloc::{assert_no_alloc, AllocDisabler};
-use tuner_dsp::{signals, Scale, Tuner, TunerConfig, TuningParams, VoiceRange};
+use tuner_dsp::{signals, Scale, Style, Tuner, TunerConfig, TuningParams, VoiceRange};
 
 #[global_allocator]
 static A: AllocDisabler = AllocDisabler;
@@ -26,7 +26,7 @@ fn phrase() -> Vec<f32> {
 }
 
 fn param_cycle(i: usize) -> TuningParams {
-    TuningParams {
+    let p = TuningParams {
         key: (i % 12) as u8,
         scale: [
             Scale::Chromatic,
@@ -41,7 +41,12 @@ fn param_cycle(i: usize) -> TuningParams {
         mix: 1.0 - (i % 2) as f32 * 0.3,
         gate_threshold_db: -60.0,
         bypass: i % 7 == 6,
-    }
+        hard_tune: i % 2 == 1,
+        formant_semitones: (i % 3) as f32 - 1.0,
+        ..Default::default()
+    };
+    // Exercise every effect too.
+    Style::ALL[i % Style::ALL.len()].apply(&p)
 }
 
 fn run_seconds(seconds: usize) {
@@ -52,6 +57,7 @@ fn run_seconds(seconds: usize) {
     })
     .unwrap();
     let mut out = [0.0f32; 128];
+    let mut cable = [0.0f32; 128];
     let blocks = seconds * SR as usize / 128;
     let mut pos = 0;
     for b in 0..blocks {
@@ -65,7 +71,11 @@ fn run_seconds(seconds: usize) {
             if let Some(p) = p {
                 t.set_params(&p);
             }
-            t.process(block, &mut out);
+            if b % 2 == 0 {
+                t.process(block, &mut out);
+            } else {
+                t.process_split(block, &mut out, &mut cable);
+            }
             let _ = t.meters();
         });
         assert!(out.iter().all(|v| v.is_finite()));

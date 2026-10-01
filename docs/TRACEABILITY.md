@@ -27,6 +27,11 @@ checks run in CI; hardware checks are part of the per-release manual matrix.
 | FR-20 | versioned `AppConfig` + migrations | `config::tests::fr20_*` |
 | FR-21 | presets | UI tests, manual |
 | FR-22 | `tauri-plugin-updater`, release workflow | release workflow asset verification, manual |
+| FR-23 | `TuningParams::hard_tune`, `Tuner::analyze`/`glide`, `NoteSnapper::set_hysteresis` | `scale::tests::fr23_*`, `pipeline::fr23_*`, `styles::tests::fr23_*`, `commands::tests::fr23_*`, UI tests |
+| FR-24 | `Psola::overlap_add_resampled`, `formant_semitones` | `psola::tests::fr24_*`, `pipeline::fr24_*`, `params::tests::fr24_*`, UI tests |
+| FR-25 | `tuner-dsp::fx` (EQ, compressor, doubler, echo, Dattorro plate), Effects tab | `fx::*::tests::fr25_*`, `filters::tests::fr25_*`, `params::tests::fr25_*`, `config::tests::fr20_fr25_*`, UI tests; `styled_mid` benchmark |
+| FR-26 | `FxRoute`, `Tuner::process_split`, engine monitor/cable buffers | `fx::tests::fr26_*`, `params::tests::fr26_*`, `pipeline::fr26_*`, `engine_mock::fr26_*`, UI tests |
+| FR-27 | `tuner_dsp::Style`, `list_styles`/`apply_style`, Styles card, CLI `--style` | `styles::tests::fr27_*`, `pipeline::fr27_*`, `commands::tests::fr27_*`, UI tests |
 | NFR-01 | latency budget | FR-16 measurement on the hardware matrix |
 | NFR-02 | zero xruns in 60 min | diagnostics counters, soak run |
 | NFR-03 | 128-sample block < 0.27 ms | `cargo bench` + `scripts/bench-gate.ps1` in CI |

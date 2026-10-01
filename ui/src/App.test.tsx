@@ -27,6 +27,12 @@ describe("App shell", () => {
     expect(await screen.findByText("Running")).toBeInTheDocument();
   });
 
+  it("FR-25: has an Effects tab", async () => {
+    const { user } = renderWithClient(<App />);
+    await user.click(await screen.findByRole("tab", { name: "Effects" }));
+    expect(await screen.findByRole("slider", { name: "Reverb level" })).toBeInTheDocument();
+  });
+
   it("switches tabs and shows diagnostics", async () => {
     const { user } = renderWithClient(<App />);
     await user.click(await screen.findByRole("tab", { name: "Diagnostics" }));
