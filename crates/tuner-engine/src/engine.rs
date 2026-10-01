@@ -106,6 +106,7 @@ struct Processor {
     controls: Arc<SharedControls>,
     generation: u64,
     out: Vec<f32>,
+    cable_out: Vec<f32>,
     monitor_tx: Producer<f32>,
     cable_tx: Option<Producer<f32>>,
     meters: triple_buffer::Input<DspMeters>,
@@ -144,12 +145,15 @@ impl Processor {
     fn process_chunk(&mut self, input: &[f32]) {
         let n = input.len();
         let out = &mut self.out[..n];
+        let cable_out = &mut self.cable_out[..n];
         let target_gain = if let Some(probe) = self.probe.as_mut() {
             // Latency test: DSP bypassed, chirp to the monitor at unity.
             probe.step(input, out);
+            cable_out.copy_from_slice(out);
             1.0
         } else {
-            self.tuner.process(input, out);
+            // Effects can be routed to the headphones, the virtual mic or both (FR-26).
+            self.tuner.process_split(input, out, cable_out);
             self.controls.monitor_gain()
         };
         if let Some(probe) = self.probe.take_if(|p| p.done()) {
@@ -159,7 +163,7 @@ impl Processor {
         }
 
         if let Some(cable) = self.cable_tx.as_mut() {
-            push_all(cable, out, &self.stats);
+            push_all(cable, cable_out, &self.stats);
         }
         for s in out.iter_mut() {
             self.monitor_gain += (target_gain - self.monitor_gain) * self.gain_k;
@@ -408,6 +412,7 @@ impl Engine {
             generation: controls.generation(),
             controls: controls.clone(),
             out: vec![0.0; MAX_BLOCK],
+            cable_out: vec![0.0; MAX_BLOCK],
             monitor_tx: mon_tx,
             cable_tx,
             meters: meters_in,

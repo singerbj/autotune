@@ -33,7 +33,7 @@ impl DcBlocker {
     }
 }
 
-/// RBJ biquad, used as the 70 Hz high-pass.
+/// RBJ biquad: the 70 Hz conditioning high-pass and the effects EQ.
 #[derive(Clone, Debug)]
 pub(crate) struct Biquad {
     b0: f32,
@@ -60,6 +60,53 @@ impl Biquad {
             z1: 0.0,
             z2: 0.0,
         }
+    }
+
+    /// Peaking EQ (RBJ cookbook).
+    pub(crate) fn peaking(sample_rate: f32, freq: f32, q: f32, gain_db: f32) -> Self {
+        let a = 10f32.powf(gain_db / 40.0);
+        let w0 = 2.0 * PI * freq / sample_rate;
+        let (sin, cos) = w0.sin_cos();
+        let alpha = sin / (2.0 * q);
+        let a0 = 1.0 + alpha / a;
+        Self {
+            b0: (1.0 + alpha * a) / a0,
+            b1: -2.0 * cos / a0,
+            b2: (1.0 - alpha * a) / a0,
+            a1: -2.0 * cos / a0,
+            a2: (1.0 - alpha / a) / a0,
+            z1: 0.0,
+            z2: 0.0,
+        }
+    }
+
+    /// High shelf with slope 1 (RBJ cookbook).
+    pub(crate) fn high_shelf(sample_rate: f32, freq: f32, gain_db: f32) -> Self {
+        let a = 10f32.powf(gain_db / 40.0);
+        let w0 = 2.0 * PI * freq / sample_rate;
+        let (sin, cos) = w0.sin_cos();
+        let alpha = sin / 2.0 * core::f32::consts::SQRT_2;
+        let sq = 2.0 * a.sqrt() * alpha;
+        let a0 = (a + 1.0) - (a - 1.0) * cos + sq;
+        Self {
+            b0: a * ((a + 1.0) + (a - 1.0) * cos + sq) / a0,
+            b1: -2.0 * a * ((a - 1.0) + (a + 1.0) * cos) / a0,
+            b2: a * ((a + 1.0) + (a - 1.0) * cos - sq) / a0,
+            a1: 2.0 * ((a - 1.0) - (a + 1.0) * cos) / a0,
+            a2: ((a + 1.0) - (a - 1.0) * cos - sq) / a0,
+            z1: 0.0,
+            z2: 0.0,
+        }
+    }
+
+    /// Take `other`'s coefficients but keep this filter's state, so a
+    /// parameter change doesn't click.
+    pub(crate) fn set_coeffs(&mut self, other: &Biquad) {
+        self.b0 = other.b0;
+        self.b1 = other.b1;
+        self.b2 = other.b2;
+        self.a1 = other.a1;
+        self.a2 = other.a2;
     }
 
     /// Transposed direct form II.
@@ -121,6 +168,21 @@ impl Smoother {
     pub(crate) fn snap(&mut self, v: f32) {
         self.value = v;
         self.target = v;
+    }
+
+    /// At rest on exactly 0.
+    #[inline]
+    pub(crate) fn is_silent(&self) -> bool {
+        self.value == 0.0 && self.target == 0.0
+    }
+
+    /// Jump straight to the current target.
+    pub(crate) fn finish(&mut self) {
+        self.value = self.target;
+    }
+
+    pub(crate) fn set_time(&mut self, tau_s: f32, sample_rate: f32) {
+        self.coeff = one_pole_coeff(tau_s, sample_rate);
     }
 }
 
@@ -311,6 +373,30 @@ mod tests {
         };
         assert!(rms_after(20.0) < 0.12);
         assert!(rms_after(440.0) > 0.97);
+    }
+
+    fn sine_gain(mut f: Biquad, freq: f32, sr: f32) -> f32 {
+        let n = 24_000;
+        let mut acc = 0.0;
+        for i in 0..n {
+            let y = f.process((2.0 * PI * freq * i as f32 / sr).sin());
+            if i > n / 2 {
+                acc += y * y;
+            }
+        }
+        (acc / (n / 2) as f32).sqrt() * core::f32::consts::SQRT_2
+    }
+
+    #[test]
+    fn fr25_peaking_and_shelf_gains() {
+        let sr = 48_000.0;
+        let db = |g: f32| 20.0 * g.log10();
+        let peak = || Biquad::peaking(sr, 3_500.0, 0.9, 6.0);
+        assert!((db(sine_gain(peak(), 3_500.0, sr)) - 6.0).abs() < 0.2);
+        assert!(db(sine_gain(peak(), 200.0, sr)).abs() < 0.3);
+        let shelf = || Biquad::high_shelf(sr, 10_000.0, 6.0);
+        assert!((db(sine_gain(shelf(), 18_000.0, sr)) - 6.0).abs() < 0.6);
+        assert!(db(sine_gain(shelf(), 300.0, sr)).abs() < 0.2);
     }
 
     #[test]

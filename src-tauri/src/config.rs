@@ -169,6 +169,18 @@ pub fn migrate(v: serde_json::Value) -> serde_json::Value {
     if let Ok(defaults) = serde_json::to_value(AppConfig::default()) {
         merge_defaults(&mut v, &defaults);
     }
+    // Saved presets carry full parameter sets; give older ones the fields
+    // added since (hard tune, formant, effects) at their neutral defaults.
+    if let (Some(presets), Ok(params)) = (
+        v.get_mut("presets").and_then(|p| p.as_array_mut()),
+        serde_json::to_value(TuningParams::default()),
+    ) {
+        for preset in presets {
+            if let Some(p) = preset.get_mut("params") {
+                merge_defaults(p, &params);
+            }
+        }
+    }
     v
 }
 
@@ -320,6 +332,28 @@ mod tests {
         assert_eq!(c.monitor_device.as_deref(), Some("h1"));
         assert_eq!(c.params.retune_ms, 55.0);
         assert!(c.virtual_mic_enabled);
+    }
+
+    #[test]
+    fn fr20_fr25_old_params_and_presets_gain_neutral_effects() {
+        let old_params = serde_json::json!({
+            "key": 2, "scale": "major", "customMask": 4095, "retuneMs": 0.0,
+            "humanize": 0.0, "voiceRange": "mid", "mix": 1.0,
+            "gateThresholdDb": -60.0, "bypass": false
+        });
+        let v2 = serde_json::json!({
+            "schemaVersion": 2,
+            "params": old_params,
+            "presets": [{ "name": "Robot", "params": old_params }],
+        });
+        let c: AppConfig = serde_json::from_value(migrate(v2)).unwrap();
+        for p in [c.params, c.presets[0].params] {
+            assert_eq!(p.key, 2);
+            assert_eq!(p.retune_ms, 0.0);
+            assert!(!p.hard_tune);
+            assert_eq!(p.formant_semitones, 0.0);
+            assert_eq!(p.fx, tuner_dsp::FxParams::default());
+        }
     }
 
     #[test]

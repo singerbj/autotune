@@ -97,6 +97,11 @@ impl NoteSnapper {
         }
     }
 
+    /// Change the margin; 0 switches notes exactly at the midpoint.
+    pub fn set_hysteresis(&mut self, hysteresis: f32) {
+        self.hysteresis = hysteresis.max(0.0);
+    }
+
     pub fn current(&self) -> Option<i32> {
         self.current
     }
@@ -176,6 +181,14 @@ mod tests {
         assert_eq!(s.snap(60.65, 0x0FFF), Some(61));
         assert_eq!(s.snap(60.45, 0x0FFF), Some(61));
         assert_eq!(s.snap(60.35, 0x0FFF), Some(60));
+    }
+
+    #[test]
+    fn fr23_zero_hysteresis_switches_at_the_midpoint() {
+        let mut s = NoteSnapper::new(0.0);
+        assert_eq!(s.snap(60.45, 0x0FFF), Some(60));
+        assert_eq!(s.snap(60.55, 0x0FFF), Some(61));
+        assert_eq!(s.snap(60.45, 0x0FFF), Some(60));
     }
 
     #[test]

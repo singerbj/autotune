@@ -88,4 +88,49 @@ describe("TunePanel (FR-06 – FR-11)", () => {
     await waitFor(() => expect(load).toHaveBeenCalledWith("Hard tune"));
     await waitFor(() => expect(screen.getByText("0 ms")).toBeInTheDocument());
   });
+
+  it("FR-23: hard tune sends { hardTune } and locks retune and humanize", async () => {
+    const spy = vi.spyOn(commands, "setParams");
+    const { user } = await renderPanel();
+    const retune = screen.getByRole("slider", { name: "Retune speed" });
+    expect(retune).not.toHaveAttribute("data-disabled");
+    await user.click(screen.getByRole("switch", { name: "Hard tune" }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ hardTune: true }));
+    await waitFor(() =>
+      expect(screen.getByRole("slider", { name: "Retune speed" })).toHaveAttribute("data-disabled"),
+    );
+    expect(screen.getByText("Hard tune always snaps at 0 ms.")).toBeInTheDocument();
+  });
+
+  it("FR-23: suggests a scale when hard tune runs on chromatic", async () => {
+    await commands.setParams({ scale: "chromatic", hardTune: true });
+    await renderPanel();
+    expect(screen.getByText(/choose your song's key/)).toBeInTheDocument();
+  });
+
+  it("FR-24: the formant slider sends { formantSemitones }", async () => {
+    const spy = vi.spyOn(commands, "setParams");
+    const { user } = await renderPanel();
+    const formant = screen.getByRole("slider", { name: "Formant" });
+    await user.click(formant);
+    await user.keyboard("{ArrowLeft}");
+    await waitFor(() => expect(spy).toHaveBeenCalledWith({ formantSemitones: -0.5 }));
+  });
+
+  it("FR-27: applies a built-in style and keeps the key", async () => {
+    const apply = vi.spyOn(commands, "applyStyle");
+    await commands.setParams({ key: 7, scale: "chromatic" });
+    const { user } = await renderPanel();
+    await user.click(await screen.findByRole("button", { name: "Apply style Chrome Snap" }));
+    await waitFor(() => expect(apply).toHaveBeenCalledWith("chromeSnap"));
+    await waitFor(() =>
+      expect(screen.getByRole("switch", { name: "Hard tune" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      ),
+    );
+    expect(screen.getByRole("combobox", { name: "Key" })).toHaveTextContent("G");
+    expect(screen.getByRole("combobox", { name: "Scale" })).toHaveTextContent("Major");
+    expect(screen.getByRole("button", { name: "Apply style Night Drive" })).toBeInTheDocument();
+  });
 });

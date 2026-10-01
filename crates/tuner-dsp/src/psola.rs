@@ -7,7 +7,10 @@
 //! Synthesis marks advance by `period / ratio`; each takes the nearest
 //! complete analysis grain (two periods, Hann-windowed) and overlap-adds it.
 //! The accumulated window sum is divided out so amplitude stays flat for any
-//! ratio. All rings are sized at construction; nothing here allocates.
+//! ratio. A formant shift (FR-24) resamples each grain: two source periods
+//! squeezed or stretched by the formant ratio, which scales the spectral
+//! envelope without moving the pitch. All rings are sized at construction;
+//! nothing here allocates.
 
 const HANN_LEN: usize = 1024;
 const MAX_MARKS: usize = 64;
@@ -36,6 +39,8 @@ pub(crate) struct Psola {
     unvoiced_period: f32,
     synth_pos: f64,
     sample_rate: f32,
+    /// Formant ratio; exactly 1 takes the unresampled path.
+    formant: f32,
 }
 
 impl Psola {
@@ -62,6 +67,7 @@ impl Psola {
             unvoiced_period: 0.0,
             synth_pos: 0.0,
             sample_rate,
+            formant: 1.0,
         };
         p.set_latency(latency);
         p
@@ -82,6 +88,11 @@ impl Psola {
         self.wsum.fill(0.0);
         self.mark_count = 0;
         self.last_mark = self.write_pos;
+    }
+
+    /// Formant ratio (> 1 raises the formants). Takes effect from the next grain.
+    pub(crate) fn set_formant(&mut self, ratio: f32) {
+        self.formant = ratio.clamp(0.5, 2.0);
     }
 
     pub(crate) fn reset(&mut self) {
@@ -163,13 +174,15 @@ impl Psola {
         let t = self.write_pos;
         let limit = t as f64;
         let ratio = ratio.clamp(0.25, 4.0);
+        // A resampled grain interpolates one sample past the period.
+        let reach = if self.formant == 1.0 { 0 } else { 2 };
         while self.synth_pos < limit {
             let ts = self.synth_pos.round() as i64;
             let mut chosen: Option<Mark> = None;
             let mut best_d = i64::MAX;
             for k in 0..self.mark_count {
                 let m = self.marks[(self.mark_head + MAX_MARKS - 1 - k) % MAX_MARKS];
-                if m.pos + m.period.ceil() as i64 > t {
+                if m.pos + m.period.ceil() as i64 + reach > t {
                     continue; // grain not fully captured yet
                 }
                 let d = (m.pos - ts).abs();
@@ -192,6 +205,10 @@ impl Psola {
     }
 
     fn overlap_add(&mut self, ts: i64, m: Mark) {
+        if self.formant != 1.0 {
+            self.overlap_add_resampled(ts, m);
+            return;
+        }
         let half = m.period.round().max(2.0) as i64;
         let inv_len = HANN_LEN as f32 / (2 * half) as f32;
         for i in -half..half {
@@ -200,6 +217,29 @@ impl Psola {
             let frac = x - k as f32;
             let w = self.hann[k] + (self.hann[(k + 1).min(HANN_LEN)] - self.hann[k]) * frac;
             let src = self.cond[self.idx(m.pos + i)];
+            let dst = self.idx(ts + i);
+            self.acc[dst] += w * src;
+            self.wsum[dst] += w;
+        }
+    }
+
+    /// Grain of two source periods, resampled by the formant ratio.
+    fn overlap_add_resampled(&mut self, ts: i64, m: Mark) {
+        let k = self.formant;
+        let half = (m.period / k).round().max(2.0) as i64;
+        let inv_len = HANN_LEN as f32 / (2 * half) as f32;
+        for i in -half..half {
+            let x = (i + half) as f32 * inv_len;
+            let hk = x as usize;
+            let frac = x - hk as f32;
+            let w = self.hann[hk] + (self.hann[(hk + 1).min(HANN_LEN)] - self.hann[hk]) * frac;
+            let s = i as f32 * k;
+            let fl = s.floor();
+            let sf = s - fl;
+            let base = m.pos + fl as i64;
+            let a = self.cond[self.idx(base)];
+            let b = self.cond[self.idx(base + 1)];
+            let src = a + (b - a) * sf;
             let dst = self.idx(ts + i);
             self.acc[dst] += w * src;
             self.wsum[dst] += w;
@@ -231,7 +271,12 @@ mod tests {
     use crate::{scale::hz_to_midi, signals, PitchDetector};
 
     fn run(x: &[f32], sr: f32, period: Option<f32>, ratio: f32) -> Vec<f32> {
+        run_formant(x, sr, period, ratio, 1.0)
+    }
+
+    fn run_formant(x: &[f32], sr: f32, period: Option<f32>, ratio: f32, formant: f32) -> Vec<f32> {
         let mut p = Psola::new(sr, 686, 480);
+        p.set_formant(formant);
         let mut out = Vec::with_capacity(x.len());
         for chunk in x.chunks(32) {
             for &s in chunk {
@@ -280,6 +325,70 @@ mod tests {
             let got = hz_to_midi(e.hz) - hz_to_midi(f);
             assert!((got - semis).abs() < 0.05, "want {semis} got {got}");
         }
+    }
+
+    /// Harmonics of `f0` under a Gaussian spectral envelope centred on
+    /// `formant_hz`: a voice with a single, clean formant.
+    fn formant_voice(f0: f32, formant_hz: f32, sr: f32, len: usize) -> Vec<f32> {
+        (0..len)
+            .map(|i| {
+                let t = i as f32 / sr;
+                (1..60)
+                    .map(|h| {
+                        let hz = f0 * h as f32;
+                        let a = (-((hz - formant_hz) / 250.0).powi(2)).exp();
+                        a * (2.0 * core::f32::consts::PI * hz * t).sin()
+                    })
+                    .sum::<f32>()
+                    * 0.2
+            })
+            .collect()
+    }
+
+    /// Power-weighted mean frequency over the harmonics of `f0`
+    /// (Hann-windowed DFT evaluated at each harmonic).
+    fn envelope_centre(y: &[f32], sr: f32, f0: f32) -> f32 {
+        let n = y.len();
+        let (mut num, mut den) = (0.0f64, 0.0f64);
+        for h in 1..60 {
+            let hz = f64::from(f0) * f64::from(h);
+            let w = 2.0 * core::f64::consts::PI * hz / f64::from(sr);
+            let (mut re, mut im) = (0.0f64, 0.0f64);
+            for (i, &v) in y.iter().enumerate() {
+                let win = 0.5 - 0.5 * (2.0 * core::f64::consts::PI * i as f64 / n as f64).cos();
+                re += win * f64::from(v) * (w * i as f64).cos();
+                im -= win * f64::from(v) * (w * i as f64).sin();
+            }
+            let p = re * re + im * im;
+            num += p * hz;
+            den += p;
+        }
+        (num / den) as f32
+    }
+
+    #[test]
+    fn fr24_formant_shift_moves_envelope_not_pitch() {
+        let sr = 48_000.0;
+        let f = 110.0;
+        let x = formant_voice(f, 1_500.0, sr, 48_000);
+        let mut det = PitchDetector::new(sr, 1372);
+        let mut centres = Vec::new();
+        for semis in [-4.0f32, 0.0, 4.0] {
+            let y = run_formant(&x, sr, Some(sr / f), 1.0, (semis / 12.0).exp2());
+            assert!(y.iter().all(|v| v.is_finite()));
+            let e = det
+                .detect(&y[30_000..31_372], &[], 70.0, 1000.0)
+                .expect("pitch");
+            assert!(
+                (hz_to_midi(e.hz) - hz_to_midi(f)).abs() < 0.1,
+                "pitch moved at {semis}"
+            );
+            centres.push(envelope_centre(&y[30_000..39_600], sr, f));
+        }
+        // 1500 Hz → ≈ 1190 Hz / ≈ 1890 Hz.
+        assert!((centres[1] - 1_500.0).abs() < 100.0, "{centres:?}");
+        assert!((centres[0] - 1_190.0).abs() < 150.0, "{centres:?}");
+        assert!((centres[2] - 1_890.0).abs() < 150.0, "{centres:?}");
     }
 
     #[test]
