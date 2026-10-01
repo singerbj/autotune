@@ -1,8 +1,10 @@
 # Pester 5 tests for install-vbcable.ps1 (run in CI on windows-latest).
 BeforeAll {
     $script = Join-Path $PSScriptRoot '..\resources\install-vbcable.ps1'
-    # Dot-source to load the functions without running the entry point.
-    . $script -Action Detect -RegistryKey 'HKCU:\Software\TunedUpTest' -PackDir (Join-Path $TestDrive 'pack')
+    # Dot-source to load the functions without running the entry point. The
+    # script's parameters become variables of this scope, which the tests'
+    # It blocks inherit: DryRun skips real side effects and waits.
+    . $script -Action Detect -RegistryKey 'HKCU:\Software\TunedUpTest' -PackDir (Join-Path $TestDrive 'pack') -DryRun -WaitSeconds 0
 }
 
 Describe 'Test-VBCableInstalled' {
@@ -48,7 +50,6 @@ Describe 'Test-VBCableActive (ADR 0011)' {
 
 Describe 'Invoke-Install (FR-15, ADR 0011)' {
     BeforeEach {
-        $script:DryRun = $true
         Mock Test-VBCableInstalled { $false }
         Mock Get-DriverPack { 'C:\pack\VBCABLE_Setup_x64.exe' }
         Mock Test-TrustedVBAudioSignature { $true }
@@ -83,7 +84,9 @@ Describe 'Invoke-Install (FR-15, ADR 0011)' {
         Should -Invoke Save-Marker -Times 1 -ParameterFilter { $Installed -eq $true }
     }
     It 'fails without recording the marker when the driver did not install' {
-        $script:DryRun = $false
+        # A local in this It block shadows the dot-sourced switch for the
+        # functions it calls, so the post-setup driver check runs.
+        Set-Variable -Name DryRun -Value $false
         Mock Invoke-Setup { 1 }
         { Invoke-Install } | Should -Throw '*not installed*'
         Should -Invoke Save-Marker -Times 0
@@ -92,7 +95,6 @@ Describe 'Invoke-Install (FR-15, ADR 0011)' {
 
 Describe 'Invoke-Repair (ADR 0011)' {
     BeforeEach {
-        $script:DryRun = $true
         Mock Invoke-AudioServiceRestart { }
         Mock Install-FromPack { }
         Mock Save-Marker { }
@@ -137,7 +139,6 @@ Describe 'Exit codes are clean integers' {
         @($r).Count | Should -Be 1
     }
     It 'holds for a fresh install too' {
-        $script:DryRun = $true
         Mock Test-VBCableInstalled { $false }
         Mock Install-FromPack { }
         Mock Save-Marker { }
@@ -152,7 +153,6 @@ Describe 'Exit codes are clean integers' {
 
 Describe 'Invoke-Uninstall' {
     BeforeEach {
-        $script:DryRun = $true
         Mock Invoke-AudioServiceRestart { }
     }
     It 'leaves VB-Cable alone when another installer put it there' {
