@@ -2,7 +2,8 @@
 //!
 //! Pipeline per block (see `ARCHITECTURE.md` › DSP pipeline):
 //! conditioning → McLeod pitch detection → voicing decision → scale snap with
-//! hysteresis → retune glide → PSOLA shift → dry/wet mix and soft limiter.
+//! hysteresis → retune glide → PSOLA shift (with optional formant shift) →
+//! dry/wet mix → effects (EQ, compressor, doubler, echo, reverb) → soft limiter.
 //!
 //! Everything is allocated in [`Tuner::new`]; [`Tuner::process`] never
 //! allocates, locks or panics, and is deterministic for a given seed.
@@ -10,16 +11,22 @@
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 
 mod filters;
+mod fx;
 mod mpm;
 mod params;
 mod psola;
 mod rng;
 pub mod scale;
 pub mod signals;
+mod styles;
 mod tuner;
 
 pub use mpm::{PitchDetector, PitchEstimate};
-pub use params::{Scale, TuningParams, VoiceRange, MAX_SHIFT_SEMITONES};
+pub use params::{
+    DelayDivision, FxParams, FxRoute, Scale, TuningParams, VoiceRange, FX_WORDS,
+    MAX_FORMANT_SEMITONES, MAX_SHIFT_SEMITONES,
+};
+pub use styles::Style;
 pub use tuner::{DspMeters, Tuner, TunerConfig};
 
 /// Lowest pitch any preset can track; all buffers are sized for it.

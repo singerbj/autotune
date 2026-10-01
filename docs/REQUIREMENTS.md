@@ -41,6 +41,11 @@ All are required for v1 except FR-21, which is a stretch goal.
 | FR-20 | Shell | Settings persist across restarts in a versioned config schema. |
 | FR-21 | Shell | Save and load named tuning presets (stretch). |
 | FR-22 | Shell | Auto-update through a signed updater. |
+| FR-23 | Tuning | Hard tune: notes switch instantly at the midpoint between scale notes, retune and humanize are treated as 0, and correction holds through short detection dropouts. |
+| FR-24 | Tuning | Formant shift of ±4 semitones that changes the voice's character without changing the tuned note. |
+| FR-25 | Effects | Vocal effects after the tuner with no added latency: presence and air EQ, compressor, doubler, tempo-synced echo, and plate reverb. Every effect is transparent at its default. |
+| FR-26 | Effects | Doubler, echo and reverb can each be heard in the headphones, the virtual mic, or both. |
+| FR-27 | Effects | Built-in styles apply a finished sound (tuning feel, formant, effects) in one click and keep key, voice range, gate, echo tempo and routes. |
 
 ## Non-functional requirements
 

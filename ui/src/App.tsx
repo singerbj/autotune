@@ -1,8 +1,15 @@
-import { ActivityIcon, AudioLinesIcon, SettingsIcon, SlidersVerticalIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  AudioLinesIcon,
+  SettingsIcon,
+  SlidersVerticalIcon,
+  SparklesIcon,
+} from "lucide-react";
 import { useState } from "react";
 
 import { AudioPanel } from "@/components/audio/AudioPanel";
 import { DiagnosticsPanel } from "@/components/diagnostics/DiagnosticsPanel";
+import { EffectsPanel } from "@/components/effects/EffectsPanel";
 import { Header } from "@/components/Header";
 import { SettingsPanel } from "@/components/settings/SettingsPanel";
 import { TunePanel } from "@/components/tune/TunePanel";
@@ -31,6 +38,10 @@ export function App() {
                 <SlidersVerticalIcon aria-hidden />
                 Tune
               </TabsTrigger>
+              <TabsTrigger value="effects">
+                <SparklesIcon aria-hidden />
+                Effects
+              </TabsTrigger>
               <TabsTrigger value="audio">
                 <AudioLinesIcon aria-hidden />
                 Audio
@@ -49,6 +60,9 @@ export function App() {
             <div className="mx-auto max-w-6xl">
               <TabsContent value="tune">
                 <TunePanel />
+              </TabsContent>
+              <TabsContent value="effects">
+                <EffectsPanel />
               </TabsContent>
               <TabsContent value="audio">
                 <AudioPanel />

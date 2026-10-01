@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use tuner_audio::mock::{MockBackend, MockSignal};
 use tuner_audio::{AudioBackend, BackendTier, DeviceInfo, Direction};
-use tuner_dsp::TuningParams;
+use tuner_dsp::{FxParams, FxRoute, TuningParams};
 use tuner_engine::{
     Engine, EngineConfig, EngineHealth, SharedControls, Supervisor, SupervisorState,
 };
@@ -93,6 +93,48 @@ fn fr03_monitor_toggle_mutes_headphones_but_not_cable() {
     let hp = b.rendered("hp");
     assert!(!hp.is_empty() && hp.iter().all(|v| v.abs() < 1e-4));
     assert!(b.rendered("cable-in").iter().any(|v| v.abs() > 0.05));
+    drop(engine);
+}
+
+#[test]
+fn fr26_headphones_only_reverb_rings_in_headphones_not_cable() {
+    let b = MockBackend::with_default_devices();
+    b.set_signal(MockSignal::Sine {
+        hz: 220.0,
+        amp: 0.3,
+    });
+    let controls = Arc::new(SharedControls::new(
+        &TuningParams {
+            gate_threshold_db: -100.0,
+            fx: FxParams {
+                reverb_mix: 1.0,
+                reverb_decay: 1.0,
+                reverb_route: FxRoute::Headphones,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+        true,
+        1.0,
+    ));
+    let engine = Engine::start(&b, &headset_config(), controls).unwrap();
+    assert!(wait_until(Duration::from_secs(2), || b
+        .first_sound("hp")
+        .is_some()));
+    std::thread::sleep(Duration::from_millis(300));
+    b.set_signal(MockSignal::Silence);
+    // Let the dry voice and the DSP latency drain, then listen to the tail.
+    std::thread::sleep(Duration::from_millis(150));
+    b.clear_rendered();
+    std::thread::sleep(Duration::from_millis(200));
+    let energy = |v: Vec<f32>| v.iter().map(|x| x * x).sum::<f32>();
+    let hp = energy(b.rendered("hp"));
+    let cable = energy(b.rendered("cable-in"));
+    assert!(hp > 1e-3, "no reverb tail in the headphones ({hp})");
+    assert!(
+        cable < hp * 1e-3,
+        "reverb reached the virtual mic ({cable} vs {hp})"
+    );
     drop(engine);
 }
 

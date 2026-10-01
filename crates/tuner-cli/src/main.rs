@@ -2,6 +2,7 @@
 //!
 //! ```text
 //! tuner-cli tune  -i in.wav -o out.wav --key A --scale minor --retune-ms 10
+//! tuner-cli tune  -i in.wav -o out.wav --key A --scale minor --style chrome-snap
 //! tuner-cli track -i out.wav --csv out.csv
 //! tuner-cli gen   --kind vocal -o golden.wav
 //! ```
@@ -15,7 +16,7 @@ use tuner_cli::{
     golden_vocal, pitch_track, read_wav, track_to_csv, tune, write_wav, Audio, CliError, WavBits,
 };
 use tuner_dsp::scale::parse_key;
-use tuner_dsp::{signals, Scale, TuningParams, VoiceRange};
+use tuner_dsp::{signals, FxParams, Scale, Style, TuningParams, VoiceRange};
 
 #[derive(Parser)]
 #[command(version, about = "Offline harness for the voice tuner DSP")]
@@ -82,6 +83,16 @@ enum Cmd {
         mix: f32,
         #[arg(long, default_value_t = -60.0, allow_hyphen_values = true)]
         gate_db: f32,
+        /// Hard tune: instant note switches, retune and humanize ignored (FR-23).
+        #[arg(long)]
+        hard_tune: bool,
+        /// Formant shift in semitones, -4 … 4 (FR-24).
+        #[arg(long, default_value_t = 0.0, allow_hyphen_values = true)]
+        formant: f32,
+        /// Built-in style applied on top of the other flags (FR-27):
+        /// chrome-snap, velvet-echo, night-drive or natural.
+        #[arg(long)]
+        style: Option<String>,
         #[arg(long, default_value_t = 128)]
         block: usize,
         #[arg(long, default_value_t = 0x5EED)]
@@ -139,6 +150,9 @@ fn run(cli: Cli) -> Result<(), CliError> {
             range,
             mix,
             gate_db,
+            hard_tune,
+            formant,
+            style,
             block,
             seed,
             pcm16,
@@ -166,6 +180,15 @@ fn run(cli: Cli) -> Result<(), CliError> {
                 mix,
                 gate_threshold_db: gate_db,
                 bypass: false,
+                hard_tune,
+                formant_semitones: formant,
+                fx: FxParams::default(),
+            };
+            let params = match style {
+                Some(id) => Style::from_id(&id)
+                    .ok_or_else(|| CliError::Invalid(format!("unknown style {id:?}")))?
+                    .apply(&params),
+                None => params,
             };
             let audio = read_wav(&input)?;
             let started = Instant::now();

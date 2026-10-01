@@ -117,11 +117,13 @@ Time-domain PSOLA driven by causal pitch detection. Algorithmic latency is about
 
 1. **Conditioning:** DC blocker, 70 Hz high-pass, and a noise gate with hysteresis.
 2. **Pitch detection:** McLeod Pitch Method on the most recent analysis window of already-captured audio. Detection adds no output delay; the correction lands a few ms late, which is inaudible.
-3. **Voicing decision:** below the clarity threshold, audio passes through unshifted (consonants, breath, noise).
-4. **Target selection:** snap the smoothed pitch to the nearest note in the active key and scale, with a \~20-cent hysteresis band to stop note flip-flopping.
-5. **Retune glide:** move the applied ratio toward the target with a time constant set by retune speed (0 ms = hard robotic snap, up to \~200 ms = natural).
-6. **PSOLA shift:** pitch marks on the input, Hann-windowed grains two periods long, overlap-added at the target spacing. Small shifts keep formants intact.
-7. **Output:** dry/wet mix (default 100% wet) and a soft limiter.
+3. **Voicing decision:** below the clarity threshold, audio passes through unshifted (consonants, breath, noise). Hard tune lowers the threshold and holds the last note through dropouts of up to 40 ms (ADR 0011).
+4. **Target selection:** snap the smoothed pitch to the nearest note in the active key and scale, with a \~20-cent hysteresis band to stop note flip-flopping (none in hard tune, so notes switch exactly at the midpoint).
+5. **Retune glide:** move the applied ratio toward the target with a time constant set by retune speed (0 ms = hard robotic snap, up to \~200 ms = natural). Hard tune always uses 0 ms and no humanize.
+6. **PSOLA shift:** pitch marks on the input, Hann-windowed grains two periods long, overlap-added at the target spacing. Small shifts keep formants intact. A formant shift resamples each grain by the formant ratio, which moves the spectral envelope but not the pitch.
+7. **Mix:** dry/wet mix (default 100% wet).
+8. **Effects (ADR 0011):** presence/air EQ and a compressor in series, then doubler, tempo-synced echo and plate reverb as parallel sends. Each send is routed to the headphones, the virtual mic, or both, so the tuner produces two outputs. No effect adds latency; at their defaults they are bit-transparent and idle sends aren't processed.
+9. **Output:** a soft limiter on each output, then the bypass crossfade to the raw input.
 
 **Voice range presets set the fixed latency**
 
@@ -131,7 +133,7 @@ Time-domain PSOLA driven by causal pitch detection. Algorithmic latency is about
 | Mid (default) | 100 Hz | \~10 ms |
 | High | 150 Hz | \~7 ms |
 
-**User parameters:** key, scale (chromatic, major, minor, custom note mask), retune speed, humanize, voice range, mix, gate threshold, bypass.
+**User parameters:** key, scale (chromatic, major, minor, custom note mask), retune speed, humanize, hard tune, formant, voice range, mix, gate threshold, bypass, and the effects (presence, air, compressor threshold and ratio; doubler level, detune, delay, route; echo level, tempo, note value, feedback, route; reverb level, size, decay, pre-delay, route). Built-in styles set the sound in one click and keep key, range, gate, tempo and routes.
 
 **Implementation rules**
 

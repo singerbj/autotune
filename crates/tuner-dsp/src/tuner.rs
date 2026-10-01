@@ -3,6 +3,7 @@
 use crate::filters::{
     lin_to_db, one_pole_coeff, soft_limit, Biquad, DcBlocker, NoiseGate, Ramp, Smoother,
 };
+use crate::fx::FxChain;
 use crate::mpm::PitchDetector;
 use crate::params::{TuningParams, VoiceRange, MAX_SHIFT_SEMITONES};
 use crate::psola::Psola;
@@ -15,6 +16,17 @@ const CHUNK: usize = 32;
 /// Clarity needed to enter / stay in the voiced state.
 const CLARITY_ON: f32 = 0.80;
 const CLARITY_OFF: f32 = 0.65;
+/// Hard tune (FR-23) accepts shakier detections so the effect stays on
+/// through breathy or noisy notes…
+const HARD_CLARITY_ON: f32 = 0.70;
+const HARD_CLARITY_OFF: f32 = 0.50;
+/// …and holds the last note through detection dropouts this long.
+const HARD_HOLD_S: f32 = 0.040;
+/// Snapper hysteresis in semitones: normal vs hard tune (instant switches).
+const SNAP_HYSTERESIS: f32 = 0.2;
+/// Crossfade into the tuned signal at a note onset: normal vs hard tune.
+const VOICED_FADE_S: f32 = 0.004;
+const HARD_VOICED_FADE_S: f32 = 0.001;
 /// Input level below which nothing is considered voiced.
 const VOICING_FLOOR_DB: f32 = -50.0;
 /// Maximum random detune per note at 100 % humanize, in semitones.
@@ -72,6 +84,9 @@ pub struct Tuner {
     detect_hop: usize,
     since_detect: usize,
     voiced: bool,
+    /// Samples since the last voiced detection while holding (hard tune).
+    unvoiced_run: usize,
+    hard_hold: usize,
     hist: [f32; 3],
     hist_len: usize,
     midi_det: f32,
@@ -90,6 +105,7 @@ pub struct Tuner {
     bypass: Ramp,
     level_env: f32,
     level_release: f32,
+    fx: FxChain,
     meters: DspMeters,
 }
 
@@ -129,6 +145,8 @@ impl Tuner {
             detect_hop,
             since_detect: 0,
             voiced: false,
+            unvoiced_run: 0,
+            hard_hold: (HARD_HOLD_S * sr) as usize,
             hist: [0.0; 3],
             hist_len: 0,
             midi_det: 0.0,
@@ -142,11 +160,12 @@ impl Tuner {
             seed: config.seed,
             desired_shift: 0.0,
             applied_shift: 0.0,
-            voiced_mix: Smoother::new(0.0, 0.004, sr),
+            voiced_mix: Smoother::new(0.0, VOICED_FADE_S, sr),
             mix: Smoother::new(params.mix, 0.020, sr),
             bypass: Ramp::new(0.0, 0.010, sr),
             level_env: 0.0,
             level_release: one_pole_coeff(0.300, sr),
+            fx: FxChain::new(sr),
             meters: DspMeters {
                 target_midi: -1,
                 input_db: -200.0,
@@ -181,6 +200,18 @@ impl Tuner {
         self.mix.set_target(p.mix);
         self.bypass.set_target(if p.bypass { 1.0 } else { 0.0 });
         self.note_mask = p.note_mask();
+        self.snapper
+            .set_hysteresis(if p.hard_tune { 0.0 } else { SNAP_HYSTERESIS });
+        self.voiced_mix.set_time(
+            if p.hard_tune {
+                HARD_VOICED_FADE_S
+            } else {
+                VOICED_FADE_S
+            },
+            self.sr,
+        );
+        self.psola.set_formant((p.formant_semitones / 12.0).exp2());
+        self.fx.set_params(&p.fx);
         if p.voice_range != self.range || self.pending_range.is_some() {
             if p.voice_range == self.range {
                 self.pending_range = None;
@@ -199,6 +230,7 @@ impl Tuner {
         self.hp.reset();
         self.gate.reset();
         self.psola.reset();
+        self.fx.reset();
         self.reset_pitch_state();
         self.rng = Pcg32::new(self.seed);
         self.level_env = 0.0;
@@ -208,6 +240,7 @@ impl Tuner {
 
     fn reset_pitch_state(&mut self) {
         self.voiced = false;
+        self.unvoiced_run = 0;
         self.hist_len = 0;
         self.period = None;
         self.snapper.reset();
@@ -217,20 +250,40 @@ impl Tuner {
         self.voiced_mix.set_target(0.0);
     }
 
-    /// Process one block. `input` and `output` should have equal length; any
-    /// extra output samples are zeroed. Never allocates.
+    /// Process one block with every effect applied, whatever its route
+    /// (offline rendering). `input` and `output` should have equal length;
+    /// any extra output samples are zeroed. Never allocates.
     pub fn process(&mut self, input: &[f32], output: &mut [f32]) {
         let n = input.len().min(output.len());
         output[n..].fill(0.0);
         let mut off = 0;
         while off < n {
             let len = (n - off).min(CHUNK);
-            self.process_chunk(&input[off..off + len], &mut output[off..off + len]);
+            self.process_chunk(&input[off..off + len], &mut output[off..off + len], None);
             off += len;
         }
     }
 
-    fn process_chunk(&mut self, input: &[f32], output: &mut [f32]) {
+    /// Process one block into the two live destinations (FR-26): `monitor`
+    /// (headphones) and `cable` (virtual mic) each get the effects routed to
+    /// them. Lengths as for [`process`](Self::process). Never allocates.
+    pub fn process_split(&mut self, input: &[f32], monitor: &mut [f32], cable: &mut [f32]) {
+        let n = input.len().min(monitor.len()).min(cable.len());
+        monitor[n..].fill(0.0);
+        cable[n..].fill(0.0);
+        let mut off = 0;
+        while off < n {
+            let len = (n - off).min(CHUNK);
+            self.process_chunk(
+                &input[off..off + len],
+                &mut monitor[off..off + len],
+                Some(&mut cable[off..off + len]),
+            );
+            off += len;
+        }
+    }
+
+    fn process_chunk(&mut self, input: &[f32], output: &mut [f32], mut cable: Option<&mut [f32]>) {
         for &x in input {
             let x = if x.is_finite() {
                 x.clamp(-4.0, 4.0)
@@ -257,12 +310,23 @@ impl Tuner {
         let ratio = self.glide(input.len());
         self.psola.synthesize(ratio);
 
-        for o in output.iter_mut() {
+        for (i, o) in output.iter_mut().enumerate() {
             let (wet, dry, raw) = self.psola.pop();
             let tuned = dry + self.voiced_mix.next() * (wet - dry);
-            let mixed = soft_limit(dry + self.mix.next() * (tuned - dry));
-            let y = mixed + self.bypass.next() * (raw - mixed);
-            *o = y * self.range_fade.next();
+            let fx = self.fx.process(dry + self.mix.next() * (tuned - dry));
+            let bypass = self.bypass.next();
+            let fade = self.range_fade.next();
+            let finish = |v: f32| {
+                let limited = soft_limit(v);
+                (limited + bypass * (raw - limited)) * fade
+            };
+            match cable.as_deref_mut() {
+                Some(c) => {
+                    *o = finish(fx.monitor);
+                    c[i] = finish(fx.cable);
+                }
+                None => *o = finish(fx.all),
+            }
         }
 
         if let Some(r) = self.pending_range {
@@ -303,16 +367,28 @@ impl Tuner {
         let win = ((2.0 * self.sr / min_hz).ceil() as usize).min(self.detector.max_window());
         let (a, b) = self.psola.recent(win);
         let est = self.detector.detect(a, b, min_hz, MAX_PITCH_HZ);
-        let threshold = if self.voiced { CLARITY_OFF } else { CLARITY_ON };
+        let hard = self.params.hard_tune;
+        let threshold = match (hard, self.voiced) {
+            (false, false) => CLARITY_ON,
+            (false, true) => CLARITY_OFF,
+            (true, false) => HARD_CLARITY_ON,
+            (true, true) => HARD_CLARITY_OFF,
+        };
         let loud = lin_to_db(self.level_env) > VOICING_FLOOR_DB && self.gate.is_open();
         let voiced_est = est.filter(|e| loud && e.clarity >= threshold);
 
         let Some(e) = voiced_est else {
             if self.voiced {
-                self.reset_pitch_state();
+                // Hard tune rides out short dropouts on the last note while
+                // there is still sound; silence ends the note at once.
+                self.unvoiced_run += self.detect_hop;
+                if !(hard && loud && self.unvoiced_run < self.hard_hold) {
+                    self.reset_pitch_state();
+                }
             }
             return;
         };
+        self.unvoiced_run = 0;
 
         let midi = hz_to_midi(e.hz);
         if self.hist_len < 3 {
@@ -337,11 +413,11 @@ impl Tuner {
         self.period = Some((self.sr / midi_to_hz(med)).min(max_period));
 
         let target = self.snapper.snap(med, self.note_mask);
+        let h = if hard { 0.0 } else { self.params.humanize };
         if target != self.target {
-            self.human_offset = self.rng.bipolar() * self.params.humanize * HUMANIZE_DETUNE;
+            self.human_offset = self.rng.bipolar() * h * HUMANIZE_DETUNE;
             self.target = target;
         }
-        let h = self.params.humanize;
         let basis = med + h * (self.midi_slow - med);
         self.desired_shift = match target {
             Some(n) => {
@@ -358,7 +434,11 @@ impl Tuner {
 
     /// Retune glide (stage 5); returns the pitch ratio to apply.
     fn glide(&mut self, samples: usize) -> f32 {
-        let retune_s = self.params.retune_ms / 1000.0;
+        let retune_s = if self.params.hard_tune {
+            0.0
+        } else {
+            self.params.retune_ms / 1000.0
+        };
         if retune_s < 0.0005 {
             self.applied_shift = self.desired_shift;
         } else {

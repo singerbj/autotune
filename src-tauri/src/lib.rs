@@ -54,6 +54,8 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::save_preset,
             commands::load_preset,
             commands::delete_preset,
+            commands::list_styles,
+            commands::apply_style,
             commands::get_update_status,
             commands::check_for_update,
             commands::install_update,
